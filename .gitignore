@@ -52,3 +52,6 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+
+# Generated analytical database
+data/database/
