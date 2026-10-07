@@ -331,7 +331,7 @@ def main() -> None:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS research_oos_forecasts (
-                Date DATE PRIMARY KEY,
+                Date DATE,
                 NIFTY_Log_Return DOUBLE,
                 Actual_Volatility DOUBLE,
                 India_VIX_PreReturn DOUBLE,
@@ -345,7 +345,8 @@ def main() -> None:
                 EGARCH_t_VIX DOUBLE,
                 research_version VARCHAR,
                 asset VARCHAR,
-                forecast_target VARCHAR
+                forecast_target VARCHAR,
+                PRIMARY KEY (Date, research_version)
             )
             """
         )
@@ -368,13 +369,10 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # 10. RELOAD V1 DETERMINISTICALLY
+        # 10. LOAD V1 SAFELY
         # ----------------------------------------------------
 
         print("\n[9] Loading frozen v1 data...")
-
-        con.execute("DELETE FROM research_oos_forecasts")
-        con.execute("DELETE FROM research_model_performance")
 
         # Prepare copies so source DataFrames remain unchanged.
         forecast_load = forecasts.copy()
@@ -400,49 +398,110 @@ def main() -> None:
         performance_load["asset"] = EXPECTED_ASSET
         performance_load["forecast_target"] = EXPECTED_FORECAST_TARGET
 
-        con.register("forecast_load_df", forecast_load)
-        con.register("performance_load_df", performance_load)
 
-        con.execute(
-            """
-            INSERT INTO research_oos_forecasts
-            SELECT
-                Date,
-                NIFTY_Log_Return,
-                Actual_Volatility,
-                India_VIX_PreReturn,
-                Historical_20D,
-                EWMA,
-                GARCH_t,
-                GJR_GARCH_t,
-                EGARCH_t,
-                Historical_20D_VIX,
-                EWMA_VIX,
-                EGARCH_t_VIX,
-                research_version,
-                asset,
-                forecast_target
-            FROM forecast_load_df
-            """
-        )
+        # ----------------------------------------------------
+        # 10A. CHECK WHETHER THIS VERSION ALREADY EXISTS
+        # ----------------------------------------------------
 
-        con.execute(
+        existing_forecast_count = con.execute(
             """
-            INSERT INTO research_model_performance
-            SELECT
-                Model,
-                MAE,
-                RMSE,
-                N,
-                OOS_Start,
-                OOS_End,
-                research_version,
-                asset,
-                forecast_target
-            FROM performance_load_df
-            """
-        )
+            SELECT COUNT(*)
+            FROM research_oos_forecasts
+            WHERE research_version = ?
+            """,
+            [EXPECTED_RESEARCH_VERSION],
+        ).fetchone()[0]
 
+        existing_performance_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM research_model_performance
+            WHERE research_version = ?
+            """,
+            [EXPECTED_RESEARCH_VERSION],
+        ).fetchone()[0]
+
+
+        # ----------------------------------------------------
+        # 10B. LOAD ONLY IF VERSION IS NOT PRESENT
+        # ----------------------------------------------------
+
+        if existing_forecast_count == 0 and existing_performance_count == 0:
+
+            print(
+                f"No existing {EXPECTED_RESEARCH_VERSION} data found. "
+                "Loading authoritative source outputs..."
+            )
+
+            con.register("forecast_load_df", forecast_load)
+            con.register("performance_load_df", performance_load)
+
+            con.execute(
+                """
+                INSERT INTO research_oos_forecasts
+                SELECT
+                    Date,
+                    NIFTY_Log_Return,
+                    Actual_Volatility,
+                    India_VIX_PreReturn,
+                    Historical_20D,
+                    EWMA,
+                    GARCH_t,
+                    GJR_GARCH_t,
+                    EGARCH_t,
+                    Historical_20D_VIX,
+                    EWMA_VIX,
+                    EGARCH_t_VIX,
+                    research_version,
+                    asset,
+                    forecast_target
+                FROM forecast_load_df
+                """
+            )
+
+            con.execute(
+                """
+                INSERT INTO research_model_performance
+                SELECT
+                    Model,
+                    MAE,
+                    RMSE,
+                    N,
+                    OOS_Start,
+                    OOS_End,
+                    research_version,
+                    asset,
+                    forecast_target
+                FROM performance_load_df
+                """
+            )
+
+            print(
+                f"PASS: {EXPECTED_RESEARCH_VERSION} loaded successfully."
+            )
+
+        elif (
+            existing_forecast_count == EXPECTED_OBSERVATIONS
+            and existing_performance_count == EXPECTED_MODELS_COUNT
+        ):
+
+            print(
+                f"{EXPECTED_RESEARCH_VERSION} already exists in the database. "
+                "No reload performed."
+            )
+            print(
+                "Existing data will be validated against the authoritative "
+                "source outputs."
+            )
+
+        else:
+
+            fail(
+                f"Partial {EXPECTED_RESEARCH_VERSION} data already exists: "
+                f"{existing_forecast_count} forecast rows and "
+                f"{existing_performance_count} performance rows. "
+                "Refusing to modify the database."
+            )
         # ----------------------------------------------------
         # 11. DATABASE INTEGRITY CHECKS
         # ----------------------------------------------------
@@ -486,6 +545,7 @@ def main() -> None:
             """
         ).fetchone()[0]
 
+
         check(
             db_missing == 0,
             f"Database contains {db_missing} rows with missing forecast values.",
@@ -495,13 +555,17 @@ def main() -> None:
             """
             SELECT DISTINCT research_version
             FROM research_oos_forecasts
+            ORDER BY research_version
             """
         ).fetchall()
 
         check(
-            db_versions == [("v1",)],
-            f"Unexpected research versions found: {db_versions}",
+            (EXPECTED_RESEARCH_VERSION,) in db_versions,
+            f"Expected research version {EXPECTED_RESEARCH_VERSION} "
+            f"was not found in the database. Found: {db_versions}",
         )
+
+        print(f"Research versions present: {db_versions}")
 
         # ----------------------------------------------------
         # 12. SOURCE-TO-DATABASE VALUE CHECK
