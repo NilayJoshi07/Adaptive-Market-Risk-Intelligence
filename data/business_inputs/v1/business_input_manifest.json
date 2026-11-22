@@ -1,0 +1,21 @@
+{
+    "business_input_version": "v1",
+    "source": "DuckDB",
+    "database": "D:\\DS Projects\\Adaptive Market Risk Intelligence System\\data\\database\\adaptive_market_risk.duckdb",
+    "tables": [
+        "research_oos_forecasts",
+        "research_model_performance"
+    ],
+    "research_version": "v1",
+    "files": {
+        "oos_forecasts.csv": "a4cd32e2f24b65878c59d826908ba3ea4bfa98fe955220c56b817a7e67a1d283",
+        "model_performance.csv": "3bfc6ab8eba63899a61f9cb5063b9a7d9435b04a8a3958eb051a8ee771d08c83",
+        "research_metadata.json": "528652b013817342a3f906f5c9627e4c2ad2cbbda0d9aa778088a27a039dc717"
+    },
+    "validation": {
+        "oos_observations": 673,
+        "oos_start": "2024-01-01",
+        "oos_end": "2026-09-22",
+        "model_count": 8
+    }
+}

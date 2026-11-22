@@ -1,0 +1,1434 @@
+# Part 1 — Understanding Steps 01–05
+
+We'll study these five scripts in order. The goal isn't just to memorize their names; it's to understand what problem each solves and why the next script exists.
+
+## Step 01 — `01_load_market_daily.py`
+
+Data ingestion
+
+Purpose: Load the cleaned NIFTY 50 price data and India VIX data into DuckDB as one reusable market dataset.
+
+### A. What goes into it?
+
+The code reads two CSV files from your project's `data\processed` folder:
+
+| Input                                             | Expected columns                     | Expected observations |
+| ------------------------------------------------- | ------------------------------------ | --------------------- |
+| `nifty50_prices_clean.csv`                        | Date, Open, High, Low, Close, Volume | 2,150                 |
+| `india_vix_clean_daily_2018-01-01_2026-09-22.csv` | Date, India_VIX                      | 2,135                 |
+
+The script requires exact column names and checks that the dates, values and market-price relationships are valid.
+
+For example, it checks that the daily high is at least as high as the open and close, and the low is no higher than either. Those are basic market-data integrity checks.
+
+### B. Why combine NIFTY and India VIX?
+
+NIFTY price data describes how the market moved. India VIX is a measure of the market's expected volatility.
+
+The script joins them by `Date`, using NIFTY's trading dates as the base. In database terminology, this is a left join.
+
+NIFTY daily prices
+
+2,150 dates
+
+Left join on Date
+
+`market_daily`
+
+2,150 rows, with India VIX where available
+
+The script expects 17 NIFTY trading dates without a same-date VIX observation. It retains those rows with a missing VIX value rather than filling the gap artificially.
+
+This is important: a missing value is not the same as zero volatility. Later scripts must handle missing VIX values deliberately.
+
+### C. What happens inside DuckDB?
+
+The script:
+
+1. Locates the project root and imports the shared database path.
+2. Reads and validates the two CSV files.
+3. Joins the datasets and renames price columns to `NIFTY_Open`, `NIFTY_High`, and so on.
+4. Creates the `market_daily` table if it doesn't exist.
+5. Loads the data only if the table is empty.
+6. If the table already contains 2,150 rows, it does not reload it.
+7. If it contains a different nonzero row count, it stops instead of modifying the database.
+8. Reads the stored values back and compares them with the prepared source data.
+
+The table has a primary key on `Date`, which prevents duplicate dates in the database.
+
+### D. What does Step 01 produce?
+
+The main output is the DuckDB table:
+
+`market_daily`
+
+It contains:
+
+- `Date`
+- `NIFTY_Open`
+- `NIFTY_High`
+- `NIFTY_Low`
+- `NIFTY_Close`
+- `NIFTY_Volume`
+- `India_VIX`
+
+The script also prints a summary of row counts, date ranges and missing VIX observations.
+
+Why it matters: later business-evaluation scripts can query one consistent market table instead of independently reopening and joining the raw CSVs.
+
+One limitation to understand: the script's loading decision is based primarily on row count. If a pre-existing table has 2,150 rows but contains incorrect values, it will not reload it automatically; the reconciliation checks should detect the mismatch and stop. This is safer than silently overwriting data, but it means a mismatch requires deliberate investigation.
+
+## Step 02 — `02_load_research_v1.py`
+
+Research ingestion
+
+Purpose: Put the frozen research outputs into DuckDB so the business scripts can use them without relying on variables left in a notebook's kernel.
+
+This is the bridge between your modelling work and the business-decision system.
+
+### A. What does it read?
+
+The script reads four research artifacts from the configured `RESEARCH_OUTPUT_V1` directory:
+
+- `oos_forecasts.csv` — the out-of-sample forecasts and actual volatility.
+- `model_performance.csv` — the model-comparison metrics.
+- `research_metadata.json` — the research version, asset, forecast target and data-quality declarations.
+- `output_manifest.json` — the expected research version and inventory of the source outputs.
+
+It expects exactly 673 forecast observations and 8 model-performance records, all belonging to research version `v1`.
+
+The eight models are:
+
+1. `Historical_20D`
+2. `EWMA`
+3. `GARCH_t`
+4. `GJR_GARCH_t`
+5. `EGARCH_t`
+6. `Historical_20D_VIX`
+7. `EWMA_VIX`
+8. `EGARCH_t_VIX`
+
+The metadata also declares the target as Next-day volatility and the information set as Strict pre-return information set. The script checks these declarations; it does not recreate the forecasts or independently prove that the modelling methodology is valid.
+
+### B. What does it check before loading?
+
+It checks that:
+
+- Required files exist.
+- Forecast columns appear in the exact expected order.
+- Dates are valid, unique and chronological.
+- Forecast values contain no missing or non-finite numbers.
+- Model-performance columns and model order match the expected contract.
+- Metadata and manifest identify version `v1`.
+- The metadata declares no missing values, duplicate dates or non-finite values.
+
+This protects the database from obviously malformed or mismatched research artifacts.
+
+### C. Which database tables does it create?
+
+`research_oos_forecasts`
+
+673 rows expected · One record per date and research version
+
+Contains the NIFTY log return, actual volatility, pre-return India VIX, eight forecast-model columns, and metadata identifying the research version, asset and forecast target.
+
+`research_model_performance`
+
+8 rows expected · One record per model and research version
+
+Contains the model name, MAE, RMSE, sample size, out-of-sample start/end dates and research metadata.
+
+The script creates each table if it doesn't exist. It loads `v1` only when both corresponding version-specific tables have no `v1` records. If the expected counts already exist, it skips reloading; if only partial data exists, it stops rather than overwriting it.
+
+### D. An important limitation in its reconciliation
+
+The script checks the database row counts and missing forecast values, then compares selected fields from the first and last forecast records with the source CSV.
+
+That is useful, but it is not a full row-by-row comparison of every stored research value against the original source. In contrast, Step 01 compares the entire prepared market dataset with the database.
+
+This doesn't prove that Step 02 loaded incorrect data; it means the script's reconciliation is narrower than a full-data integrity comparison.
+
+Output: the two research tables in the same DuckDB database that Step 01 created or opened.
+
+Why Step 02 matters: it makes your frozen research results available through durable database tables, independently of the notebook's in-memory state.
+
+## Step 03 — `03_validate_database.py`
+
+Read-only validation
+
+Purpose: Check that the database has the expected structure and contents after ingestion.
+
+Unlike Steps 01 and 02, this script is explicitly read-only. It opens DuckDB using `read_only=True`.
+
+### What does it validate?
+
+| Check                           | Expected contract                                                      |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| Tables exist                    | `market_daily`, `research_oos_forecasts`, `research_model_performance` |
+| Market rows                     | 2,150                                                                  |
+| Research forecast rows          | 673                                                                    |
+| Model-performance rows          | 8                                                                      |
+| Market date range               | 2018-01-02 to 2026-09-22                                               |
+| Research date range             | 2024-01-01 to 2026-09-22                                               |
+| Research version                | Only `v1`                                                              |
+| Duplicate records               | None for market dates or research version/date pairs                   |
+| Required values                 | No unexpected nulls in the checked fields                              |
+| Same-date India VIX missingness | Exactly 17 rows                                                        |
+| Research models                 | 8 distinct models                                                      |
+
+It also checks the expected columns and their data types.
+
+### Why is this a separate script?
+
+A loading script and a validation script serve different purposes:
+
+- Step 02 is responsible for preparing and inserting research records.
+- Step 03 checks the database contract without changing the database.
+
+If Step 02 prints `INGESTION STATUS: PASS`, that means its own checks passed. Step 03 provides a separate validation run that is useful after a kernel restart, after a database change, or before downstream scripts consume the data.
+
+### What does Step 03 not prove?
+
+It does not independently recompute the research models or verify that the financial forecasting methodology is correct. It verifies the declared database contract: expected tables, schemas, counts, dates, versions and required fields.
+
+Output: a validation result in the terminal. It does not generate a new business report or intentionally modify the database.
+
+## Step 04 — `04_test_database_recovery.py`
+
+Restart and recovery test
+
+Purpose: Prove that the essential datasets can be recovered from DuckDB in a fresh Python process, without depending on variables that existed in a previous notebook kernel.
+
+This is particularly relevant to the kernel-reset problem you were solving earlier.
+
+### What does the script do?
+
+It opens the database using:
+
+```
+con = duckdb.connect(    str(DATABASE_PATH),    read_only=True)
+```
+
+Then it runs three queries:
+
+1. Recovers all 2,150 rows from `market_daily`.
+2. Recovers the 673 research forecast rows for version `v1`.
+3. Recovers the 8 model-performance records for `v1`.
+
+It checks the row counts and confirms that the expected research version is present. It also prints sample market and forecast records so you can see the recovered values.
+
+### Why does this matter?
+
+Suppose you restart your notebook kernel and lose variables such as `clean_nifty`, `evaluation`, or `forecast_matrix`.
+
+Those variables no longer exist in memory. But if the required source data has been stored correctly in DuckDB, a new Python process can query the database and reconstruct the required DataFrames.
+
+Notebook memory
+
+Temporary variables disappear when the kernel restarts.
+
+DuckDB database
+
+Stored tables remain available to a fresh Python process.
+
+One important distinction: Step 04 demonstrates recovery of these three stored datasets. It does not reconstruct every variable from every research notebook automatically. Any other variables must be recreated from their saved source data or by rerunning the relevant calculations.
+
+Output: a terminal report confirming whether the three datasets can be recovered and whether their expected counts and research version match.
+
+## Step 05 — `05_inspect_database.py`
+
+Database inspection
+
+Purpose: Let you see what is actually inside DuckDB.
+
+Steps 03 and 04 test specific requirements. Step 05 is more exploratory: it prints an overview of the database so you can understand its contents.
+
+### What does it display?
+
+| Inspection          | Information returned                      |
+| ------------------- | ----------------------------------------- |
+| Tables              | Names of the tables in the database       |
+| Row counts          | Counts for all three expected tables      |
+| Market date range   | Earliest date, latest date and total rows |
+| Research date range | Earliest date, latest date and total rows |
+| Research versions   | Counts grouped by `research_version`      |
+| Market sample       | First five market rows                    |
+| Research sample     | First five research forecast rows         |
+
+The script uses SQL queries such as:
+
+```
+SELECT
+    MIN(Date) AS start_date,
+    MAX(Date) AS end_date,
+    COUNT(*) AS rows
+FROM market_daily;
+```
+
+This query returns three things:
+
+- `MIN(Date)` — the earliest date.
+- `MAX(Date)` — the latest date.
+- `COUNT(*)` — the number of records.
+
+It is a quick way to check the coverage of the market table without printing thousands of rows.
+
+### Does Step 05 change the database?
+
+The code only executes inspection queries and doesn't issue any insert, update or delete statements. However, it opens DuckDB without `read_only=True`. Since this script is intended only for inspection, using a read-only connection would make its non-modifying purpose explicit.
+
+This is a small maintainability improvement we can consider later; there is no need to change it during this learning exercise.
+
+# 8. How Steps 01–05 fit together
+
+## 01
+
+Load market data
+
+Create and validate `market_daily`.
+
+## 02
+
+Load research data
+
+Create `research_oos_forecasts` and `research_model_performance`.
+
+## 03
+
+Validate the database
+
+Check schemas, counts, dates, versions and data-quality conditions.
+
+## 04
+
+Test recovery
+
+Confirm the essential datasets are accessible in a fresh process.
+
+## 05
+
+Inspect the database
+
+Display table contents, counts, date ranges, versions and samples.
+
+## 9. Check your understanding
+
+Before we move to Steps 06–10, try these three questions. You can answer in your own words; the goal is to make sure the purpose of the first five scripts is clear.
+
+1\. If you restart the notebook kernel, why can the data still be available?
+
+Because Python automatically remembers all old variables.
+
+Because the data is stored in DuckDB and can be queried again.
+
+Because Step 05 recreates all research calculations.
+
+2\. What is the main difference between Step 02 and Step 03?
+
+Step 02 loads research data; Step 03 validates the database contract.
+
+Both scripts only print sample rows.
+
+Step 03 trains the eight volatility models again.
+
+3\. Why does Step 01 retain missing same-date India VIX values instead of replacing them with zero?
+
+Zero and missing represent the same thing.
+
+Replacing them with zero would invent a volatility observation.
+
+The database cannot store missing values.
+
+Check my answers
+
+Once you've answered, we'll move to Steps 06–10: how the stored research data is transformed into business inputs and a risk-exposure decision policy.
+
+## First, your quiz answers
+
+You left all three unanswered, so there are no mistakes to correct. Here are the correct answers and why they matter.
+
+Q1 — Why does data survive a kernel restart?
+
+Correct answer: B. The data is stored in DuckDB and can be queried again.
+
+A DataFrame in memory is temporary; a saved database table persists on disk.
+
+Q2 — What's the difference between Steps 02 and 03?
+
+Correct answer: A. Step 02 loads research data; Step 03 validates the database contract.
+
+One writes data; the other checks that the stored data meets expected requirements.
+
+Q3 — Why preserve missing VIX values?
+
+Correct answer: B. Replacing missing values with zero would invent a volatility observation.
+
+Missing means “not available”; zero would mean an observed value of zero.
+
+# Part 2 — Understanding Steps 06–10
+
+These five scripts move the project from stored research data toward a business decision.
+
+## Step 06 — `06_prepare_business_inputs.py`
+
+Builder
+
+Purpose: Export the frozen research tables from DuckDB into files that can be used by downstream business analysis.
+
+### What it reads
+
+It opens DuckDB in read-only mode and queries two tables:
+
+- `research_oos_forecasts`
+- `research_model_performance`
+
+It selects research version `v1` and orders the observations by date. Model-performance records are ordered by RMSE, from lowest to highest.
+
+The script expects 673 out-of-sample observations, covering January 1, 2024 to September 22, 2026, and eight model-performance records.
+
+### What it creates
+
+It writes four artifacts to `data\business_inputs\v1`:
+
+| Output                         | Purpose                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| `oos_forecasts.csv`            | Forecasts, actual volatility, NIFTY log returns and India VIX data                         |
+| `model_performance.csv`        | MAE, RMSE, sample size and evaluation dates for each model                                 |
+| `research_metadata.json`       | A copy of the authoritative research metadata                                              |
+| `business_input_manifest.json` | Records the input source, row counts, dates and SHA-256 hashes of the three exported files |
+
+The manifest helps detect changes to the exported files after they are created.
+
+### Why it matters
+
+DuckDB is the durable storage layer, while these CSVs are portable data artifacts that other tools can read.
+
+One implementation detail: this script uses a hard-coded Windows project path. It also checks the expected row counts, dates, duplicate dates and missing values before exporting.
+
+Important distinction: Step 06 does not retrain any volatility models. It exports existing research results.
+
+## Step 07 — `07_validate_business_inputs.py`
+
+Validator
+
+Purpose: Check that the exported business-input files are valid and reconcile with their source data.
+
+This is much more than checking whether the CSVs exist.
+
+### What it checks
+
+- Required files, columns and column order.
+- Exactly 673 forecast rows and eight model-performance rows.
+- Expected dates, chronological ordering and unique dates.
+- Missing and non-finite numeric values.
+- Model names, uniqueness and performance fields.
+- Research version and manifest structure.
+- SHA-256 hashes recorded in the business-input manifest.
+- Forecast and performance data against the source tables in DuckDB.
+
+The code performs field-level performance reconciliation, including MAE and RMSE comparisons within a small numeric tolerance.
+
+### Why it matters
+
+Imagine someone accidentally edits one forecast value in `oos_forecasts.csv`. The file might still have 673 rows and all the correct columns, but its contents would no longer match the recorded hash. Step 07 is designed to detect that change.
+
+What a pass means: the exported files satisfy the script's defined data-quality and reconciliation rules. It does not prove that the original forecasting model is scientifically correct.
+
+## Step 08 — `08_validate_frozen_research_outputs.py`
+
+Research integrity validator
+
+Purpose: Validate the authoritative, frozen research outputs themselves, rather than just the business-input copies.
+
+Step 07 checks the business-input export. Step 08 checks the research-output contract.
+
+### What it reads
+
+From `data\research_outputs\v1`, it reads:
+
+- `oos_forecasts.csv`
+- `model_performance.csv`
+- `research_metadata.json`
+- `output_manifest.json`
+
+It also reads the corresponding research tables in DuckDB for reconciliation.
+
+### What it checks
+
+The script validates the schemas, 673 observations, expected dates, eight models, numerical integrity, metadata, and SHA-256 hashes.
+
+It then checks that the research output agrees with DuckDB, including the dates and numerical forecast fields. It also reconciles model-performance records, their observation counts and dates, and the MAE/RMSE values.
+
+This is particularly useful because a research file might be altered after its original export. A valid row count alone would not reveal such a change.
+
+### The meaning of “frozen”
+
+Here, frozen means that the research outputs are treated as a fixed, versioned input to the downstream business analysis.
+
+It does not mean that the models are permanently correct, that future forecasts will be accurate, or that the research can never be improved. A future revision should be versioned and validated separately rather than silently changing the current baseline.
+
+## Step 09 — `09_prepare_business_decision_data.py`
+
+Decision-policy builder
+
+This is a major transition in the project. Instead of merely storing or validating forecasts, the script converts a forecast into a defined business action.
+
+Purpose: Apply the frozen risk-regime and portfolio-exposure policy to the research observations.
+
+### A. Which forecast does it use?
+
+It reads the research data directly from DuckDB, selecting:
+
+- Date
+- NIFTY log return
+- Actual volatility
+- India VIX before the return
+- `EGARCH_t_VIX`
+
+It selects this forecast model explicitly rather than choosing the best model dynamically each day.
+
+The script creates `Forecasted_Volatility` as a copy of `EGARCH_t_VIX`.
+
+### B. How does it classify risk?
+
+The script uses these frozen thresholds:
+
+| Risk regime | Forecasted volatility condition |
+| ----------- | ------------------------------- |
+| Low         | At or below 0.004341            |
+| Normal      | Above 0.004341, up to 0.005549  |
+| Elevated    | Above 0.005549, up to 0.006882  |
+| High        | Above 0.006882, up to 0.007676  |
+| Extreme     | Above 0.007676                  |
+
+For example, a forecast of `0.0060` is classified as Elevated because it is above the Normal threshold but below the Elevated upper threshold.
+
+The thresholds are hard-coded in this script. Its comments and metadata state that they were calibrated using the development period only; this script applies and enforces the frozen values rather than recalculating the thresholds from scratch.
+
+### C. How does the risk regime affect exposure?
+
+The policy maps each regime to a portfolio exposure:
+
+Low
+
+### 100%
+
+Normal
+
+### 100%
+
+Elevated
+
+### 80%
+
+High
+
+### 60%
+
+Extreme
+
+### 40%
+
+Illustration of the frozen policy's exposure levels; these are policy settings, not evidence of future performance.
+
+In other words, the policy reduces exposure as forecast risk rises. Low and Normal regimes retain full exposure, while Extreme retains 40%.
+
+### D. How does it protect the evaluation period?
+
+The script divides the 673 observations into:
+
+- Development: January 1, 2024–December 31, 2025; 495 observations.
+- Evaluation: January 1, 2026–September 22, 2026; 178 observations.
+
+It checks the counts and date boundaries. It also records that the evaluation period was not used for policy calibration.
+
+This separation is important: if you tune the thresholds using the same period you later use to judge performance, you risk overstating how well the policy generalizes.
+
+### E. What does it produce?
+
+Under `data\business_decision\v1`, it writes:
+
+- `business_decision_data.csv`
+- `business_policy.json`
+- `business_decision_manifest.json`
+
+The CSV includes the source forecast, forecasted volatility, business period, risk regime and portfolio exposure. The JSON stores the frozen policy and metadata. The manifest records hashes and validation metadata.
+
+The key idea: Step 09 turns a forecast into a reproducible decision rule. It does not prove that the chosen thresholds or exposure levels are economically optimal.
+
+## Step 10 — `10_validate_business_decision_data.py`
+
+Independent policy validator
+
+Purpose: Independently reconstruct the decision labels and exposures, and check that the saved business-decision dataset matches its declared sources.
+
+This script does not simply trust the risk regimes and exposures written by Step 09. It calculates what they should be and compares the reconstructed values with the saved values.
+
+### What it checks
+
+- Required files, schema, row counts and date range.
+- Numeric integrity of the returns, volatility and exposure fields.
+- The development/evaluation split: 495 and 178 observations.
+- That `Forecasted_Volatility` matches `EGARCH_t_VIX`.
+- That the policy JSON identifies the expected research version, forecast source and `FROZEN` policy status.
+- That all thresholds and exposure mappings match the expected frozen values.
+- That the risk regimes can be independently reconstructed from the forecast values.
+- That each portfolio exposure matches the reconstructed regime.
+- That the CSV and policy JSON hashes match the manifest.
+- That the persisted decision dataset reconciles with the underlying DuckDB source.
+
+It opens DuckDB read-only and does not modify the source research data.
+
+### Why this is an important validation
+
+Suppose a row has forecast volatility `0.0060`, but the saved risk regime says `Normal`. Step 10 would reconstruct the regime from the thresholds, find that the expected regime is Elevated, and fail the check.
+
+Likewise, if an Elevated row were assigned 100% exposure instead of 80%, the independently reconstructed exposure check should detect the mismatch.
+
+A successful Step 10 therefore supports the claim that the policy was applied consistently to the saved data. It does not prove that the policy itself is the best possible investment policy.
+
+# 3. How Steps 06–10 connect
+
+Step 06 — Prepare business inputs
+
+Export research tables into CSV and metadata files
+
+Step 07 — Validate business inputs
+
+Check schemas, hashes and reconciliation against DuckDB
+
+Step 08 — Validate frozen research
+
+Check the authoritative research files and their consistency with DuckDB
+
+Step 09 — Build business-decision data
+
+Apply the forecast thresholds and frozen exposure policy
+
+Step 10 — Validate business-decision data
+
+Reconstruct regimes and exposures; verify sources and manifest
+
+One subtle but important detail: Step 09 reads directly from DuckDB, not from the CSVs exported by Step 06. So Steps 06–08 create and validate a portable business-input package and protect the frozen research contract, while Steps 09–10 separately construct and validate the policy-based decision dataset from DuckDB.
+
+# 4. The next concept to understand
+
+The next pair, Steps 11 and 12, is where the project stops asking, “What exposure does the policy choose?” and starts asking, “What would the historical financial outcome have been under that exposure?”
+
+That is also where we need to examine the portfolio-return formula carefully. A perfectly validated decision dataset can still feed a financial calculation whose assumptions need review.
+
+Before we continue, make sure these three distinctions are clear:
+
+- Forecast: what the model predicts about volatility.
+- Decision: what the frozen policy does with that forecast.
+- Evaluation: what historical outcome results when the decision is applied to market returns.
+
+Those are three different stages of the system.
+
+# Steps 11–12: Business evaluation
+
+These two scripts are the point where your project moves from risk decisions to measured business outcomes.
+
+- Step 11 — `11_evaluate_business_decision.py`: applies the frozen exposure policy to the evaluation-period NIFTY returns, calculates strategy metrics, and writes the results.
+- Step 12 — `12_validate_business_evaluation.py`: independently recalculates key values and checks that Step 11's files, returns, metrics, and summaries are internally consistent.
+
+The evaluation window is 1 January 2026–22 September 2026, containing 178 observations. The selected forecast source is `EGARCH_t_VIX`.
+
+## Step 11 — Calculate the business impact
+
+### 1. Inputs and outputs
+
+Inputs
+
+`data/business_decision/v1/business_decision_data.csv`
+
+`data/business_decision/v1/business_policy.json`
+
+The CSV supplies dates, market log returns, risk regimes, and portfolio exposures. The JSON supplies the policy metadata, including its frozen status.
+
+Outputs
+
+`data/business_evaluation/v1/business_evaluation.csv`
+
+`data/business_evaluation/v1/business_evaluation_summary.json`
+
+The CSV contains daily calculations. The JSON stores aggregate performance metrics and a breakdown by risk regime.
+
+Step 11 does not retrain the volatility models or discover new risk thresholds. It uses the prepared decisions and frozen policy to evaluate their historical outcomes.
+
+### 2. What the script does, in order
+
+1. Checks its inputs. Confirms that the two required files exist, the CSV has the expected columns, numeric values are finite, and the period labels agree with the dates.
+2. Selects the evaluation period. Checks for 178 observations, the expected first and last dates, unique dates, and chronological order.
+3. Checks the forecast and policy. Confirms that the selected forecast is `EGARCH_t_VIX`, that the forecast column matches that source, and that exposures match the frozen mapping. It also checks that the evaluation period was not marked as used for policy calibration.
+4. Calculates daily returns. Compares full market exposure with the policy-driven adaptive exposure.
+5. Builds wealth series. Compounds each strategy's daily returns to track the value of an initial unit of capital.
+6. Calculates performance metrics. Measures returns, drawdown, volatility, downside deviation, Sharpe ratio, exposure reduction, and other comparisons.
+7. Breaks results down by regime. Summarizes observations, average forecast volatility, average exposure, and return differences in each risk regime.
+8. Writes the CSV and JSON. These files become the evidence used by Step 12 and the later reporting scripts.
+
+### 3. The return calculations — an important detail
+
+The script uses logarithmic market returns as its input. It calculates static market return as:
+
+\\[ R\_{\text{static}}=e^r-1 \\]
+
+For the adaptive strategy, it first multiplies the log return \\(r\\) by the policy's exposure \\(w\\), then converts the result into a simple return:
+
+\\[ r\_{\text{adaptive}}=w r \\]
+
+\\[ R\_{\text{adaptive}}=e^{wr}-1 \\]
+
+Here, \\(w\\) is the portfolio exposure: 1.0 means 100%, 0.8 means 80%, 0.6 means 60%, and 0.4 means 40%.
+
+Example: if the daily log return were \\(-2\\%\\) and exposure were 40%, the script would calculate the adaptive simple return as \\(e^{-0.008}-1\\), approximately \\(-0.797\\%\\).
+
+This matches the actual source code. But there is a financial-methodology decision to resolve before calling the results final.
+
+If the intention is a conventional portfolio that invests fraction \\(w\\) in the index and holds the remainder in cash earning zero, the usual daily simple-return calculation is:
+
+\\[ R\_{\text{portfolio}}=w(e^r-1) \\]
+
+That differs from the script's \\(e^{wr}-1\\). Neither formula should be substituted silently: the correct choice depends on what the exposure is intended to represent. Step 12 currently checks that the implementation matches the chosen formula; it does not determine which financial interpretation is appropriate.
+
+### 4. What performance metrics does Step 11 calculate?
+
+| Metric                         | What it tells you                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Arithmetic return              | Sum of daily simple returns; useful as a descriptive measure, but not the compounded investment result.      |
+| Compounded return              | The result of compounding the daily returns over the evaluation period.                                      |
+| Terminal wealth                | The ending value of one initial unit of capital.                                                             |
+| Maximum drawdown               | The largest peak-to-trough decline in the wealth series.                                                     |
+| Annualized volatility          | How variable daily returns are, scaled to a 252-trading-day year.                                            |
+| Downside deviation             | Annualized variability of returns below the zero-return target.                                              |
+| Sharpe ratio                   | Average excess return relative to return variability; Step 11 uses a zero annual risk-free rate by default.  |
+| Average exposure reduction     | One minus average portfolio exposure.                                                                        |
+| High/Extreme regime statistics | How often the policy classified risk as High or Extreme, and the average exposure during those observations. |
+
+It also calculates negative-return observation counts and the sum of negative daily returns. These are descriptive statistics, not a substitute for examining the full loss distribution.
+
+Important distinction: a better result relative to the static strategy does not necessarily mean the adaptive strategy made money. A strategy can lose less than the benchmark and still have a negative total return.
+
+## Step 12 — Independently validate the evaluation
+
+Step 12 is designed as a read-only validator. It reads the decision data, policy, evaluation CSV, and summary JSON; it should not modify those files.
+
+### 1. What it checks
+
+1. File and schema checks: all four required files exist, and the evaluation CSV contains the expected columns.
+2. Period checks: the evaluation has 178 rows, covers the expected dates, is chronological, and has no duplicate dates.
+3. Source reconciliation: daily source values, risk regimes, exposures, and dates match the evaluation-period records in the decision dataset.
+4. Numeric integrity: required numeric columns contain no missing, non-numeric, or infinite values; exposure remains between 0 and 1, and static exposure remains 1.
+5. Frozen policy checks: the policy status is `FROZEN`, the forecast source and exposure mapping are correct, and the evaluation period is not marked as used for calibration.
+6. Return reconciliation: recalculates static returns, adaptive log returns, adaptive simple returns, and daily protection benefit from the source data.
+7. Wealth reconciliation: independently compounds daily returns and checks both wealth series.
+8. Summary metric checks: recalculates key performance measures and compares them with the saved JSON summary.
+9. Regime-summary checks: rebuilds the risk-regime summary from the daily evaluation data and compares it with the saved summary.
+10. Traceability: prints SHA-256 hashes for the current input and output files, helping identify exact file versions.
+
+### 2. What does a PASS actually prove?
+
+A PASS is meaningful, but its scope needs to be clear.
+
+- It supports that the files agree with one another and that the calculations follow the formulas encoded in the scripts.
+- It supports that the saved summary can be reconciled with the daily evaluation records.
+- It does not prove that the exposure policy is economically optimal, that the model will work in the future, or that the return formula represents the intended real-world portfolio.
+- The printed hashes provide identifiers for the current files. By themselves, they do not prove that the files are correct or unchanged from an earlier run unless compared with a trusted prior hash.
+
+## How Steps 11 and 12 fit together
+
+Step 09–10: Decision data
+
+Forecast → risk regime → exposure
+
+Step 11: Business evaluation
+
+Returns, wealth, risk metrics, regime summaries
+
+Step 12: Independent validation
+
+Recalculate and reconcile the outputs
+
+## What we should do before proceeding
+
+There is one issue worth resolving before we build further on these numbers: the interpretation of adaptive exposure and its return formula. Since Step 13 (transaction costs) and Step 15 (robustness) may use the same convention, changing it could affect multiple downstream outputs.
+
+I recommend we first agree on what `Portfolio_Exposure` represents, then assess the required downstream recalculations in a controlled way. We should not rerun or edit anything yet.
+
+Once that is resolved, the next scripts are Steps 13–14: transaction-cost evaluation and validation.
+
+# Steps 13–14: Transaction-cost evaluation and validation
+
+These scripts test whether the adaptive strategy's historical comparison still looks favorable after applying hypothetical trading costs.
+
+Step 13 calculates the scenarios and saves them. Step 14 independently reconstructs the calculations and checks the saved results. Both use the same 178-observation evaluation period.
+
+## Step 13 — `13_evaluate_transaction_costs.py`
+
+### 1. Inputs and outputs
+
+Inputs
+
+- `data/business_evaluation/v1/business_evaluation.csv`
+- `data/business_decision/v1/business_decision_data.csv`
+
+New output directory
+
+`data/business_evaluation/v1/cost_analysis/`
+
+- `transaction_cost_analysis.csv`
+- `transaction_cost_summary.json`
+
+The script reads the existing evaluation and decision files and writes results to the separate `cost_analysis` directory. It does not overwrite the original Step 11 evaluation or frozen policy.
+
+### 2. Which scenarios does it test?
+
+The script defines three assumed transaction-cost rates:
+
+| Cost assumption | Decimal rate |
+| --------------- | ------------ |
+| 5 basis points  | 0.0005       |
+| 10 basis points | 0.0010       |
+| 20 basis points | 0.0020       |
+
+One basis point is 0.01%. These are sensitivity assumptions, not verified brokerage charges or observed execution costs.
+
+It tests both the Static and Adaptive strategies at each rate, producing six scenarios.
+
+Scenario matrix
+
+Static · 5 bps
+
+100% exposure
+
+Adaptive · 5 bps
+
+Policy exposure
+
+Static · 10 bps
+
+100% exposure
+
+Adaptive · 10 bps
+
+Policy exposure
+
+Static · 20 bps
+
+100% exposure
+
+Adaptive · 20 bps
+
+Policy exposure
+
+178 daily records per scenario = 1,068 output rows in total.
+
+### 3. How the script calculates turnover
+
+The code treats the initial position as cash with zero index exposure.
+
+For the first observation:
+
+\\[ T_1=|w_1-0| \\]
+
+For subsequent observations:
+
+\\[ T_t=|w_t-w\_{t-1}| \\]
+
+It also adds final liquidation turnover equal to the last exposure. Here, \\(w_t\\) represents the target exposure and \\(T_t\\) is the turnover proxy.
+
+For example, a move from 100% exposure to 60% exposure gives a target-exposure change of 40 percentage points, or turnover of 0.40 under this convention.
+
+This is a simplified calculation based on changes in target exposure. It is not execution-level turnover and does not track all changes in portfolio weights caused by market movements between rebalances.
+
+### 4. How transaction costs are applied
+
+The script calculates the cost fraction as:
+
+\\[ C_t=T_t\frac{\text{cost bps}}{10{,}000} \\]
+
+Then it calculates net return using:
+
+\\[ R\_{\text{net},t} =(1+R\_{\text{gross},t})(1-C_t)-1 \\]
+
+In plain English, it applies the gross investment return and then deducts the modeled transaction-cost fraction multiplicatively.
+
+The gross return formula is the same one used in Step 11:
+
+\\[ R\_{\text{adaptive},t}=e^{w_t r_t}-1 \\]
+
+So Step 13 preserves the earlier return convention; it does not resolve the portfolio-weighting question discussed in Step 11.
+
+### 5. What the script measures
+
+For every strategy/cost combination, it calculates:
+
+- Compounded return and ending wealth
+- Annualized volatility and Sharpe ratio
+- Annualized downside deviation
+- Maximum drawdown
+- Number of negative-return days
+- Total one-way turnover and summed cost fractions
+- Mean daily exposure
+
+It then compares Adaptive against Static at each cost level, including differences in compounded return, drawdown and volatility.
+
+The JSON also records input-file SHA-256 hashes and explicitly documents limitations: no separate modeling of bid–ask spread, market impact, taxes, financing or operational constraints.
+
+What Step 13 can tell you: how results change under the script's stated cost assumptions and turnover convention. It cannot establish actual trading profitability or real-world implementation costs.
+
+## Step 14 — `14_validate_transaction_costs.py`
+
+Step 14 is a read-only validator. It does not simply trust the numbers in the CSV or JSON.
+
+### Validation sequence
+
+1. Required files: checks that the Step 11 evaluation, decision dataset, transaction-cost CSV and transaction-cost JSON exist.
+2. Output structure: verifies required CSV columns, 178 evaluation observations and 1,068 scenario rows.
+3. Dates and source records: checks that evaluation dates match the decision source and that no dates are missing, duplicated or unexpected.
+4. Independent reconstruction: rebuilds gross returns and turnover from the input data instead of relying on the output values.
+5. All six scenarios: checks that every strategy/cost combination exists and has the correct number of daily records.
+6. Daily calculations: independently recalculates turnover, cost fractions, net returns and compounded wealth, comparing them with the saved CSV.
+7. Summary reconciliation: recalculates performance metrics and verifies the JSON summaries and Adaptive-versus-Static comparisons.
+8. Methodology documentation: checks that the summary describes initial cash deployment, final liquidation, the cost formula and its limitations.
+
+The script uses numerical tolerances when comparing floating-point calculations, so tiny rounding differences do not automatically cause a failure.
+
+### What a PASS means
+
+A PASS supports the conclusion that the saved cost scenarios are internally consistent with the formulas and source data that the scripts specify.
+
+It does not mean that the cost assumptions are realistic for a particular instrument, that the turnover proxy matches real trades, or that the underlying portfolio-return formula is economically appropriate.
+
+## How Steps 13 and 14 fit into your project
+
+Step 11 — Gross historical evaluation
+
+Baseline and adaptive returns before modeled costs
+
+Step 13 — Cost sensitivity
+
+Three cost levels × two strategies
+
+Step 14 — Validation
+
+Reconstruct daily calculations and aggregate metrics
+
+Step 15 — Robustness evaluation
+
+Tests alternative assumptions and sensitivity scenarios
+
+### One issue to keep on the review list
+
+Your scripts are careful about reconciling calculations, but Steps 11 and 13 both use \\(e^{wr}-1\\), and the transaction-cost model uses a simplified target-exposure turnover proxy. Those assumptions are documented in the code; validation does not independently establish that they represent your intended real-world portfolio.
+
+We should preserve the current outputs while reviewing these assumptions before presenting the results as final business evidence.
+
+Next: Steps 15–16 — robustness evaluation and its validator. These examine how the comparison behaves under alternative assumptions and then check the resulting evidence.
+
+# Steps 15–16: Robustness and sensitivity analysis
+
+These scripts ask a different question from Steps 11–14:
+
+Does the adaptive strategy's historical result depend heavily on the particular period or exposure mapping we chose?
+
+- Step 15 — `15_evaluate_robustness.py`: evaluates the frozen strategy over different time slices and tests hypothetical alternative exposure mappings.
+- Step 16 — `16_validate_robustness.py`: independently reconstructs the scenarios, recalculates the metrics, and validates the saved files.
+
+An important distinction: this is sensitivity analysis, not proof that the strategy will perform well in future markets.
+
+## Step 15 — Evaluate robustness
+
+### 1. Inputs and outputs
+
+Inputs
+
+- `data/business_evaluation/v1/business_evaluation.csv`
+- `data/business_decision/v1/business_decision_data.csv`
+- `data/business_decision/v1/business_policy.json`
+
+Outputs
+
+- `data/business_evaluation/v1/robustness/robustness_results.csv`
+- `data/business_evaluation/v1/robustness/robustness_summary.json`
+
+The script reads the existing evaluation and decision files, checks the dates and numeric values, and confirms that the baseline exposure mapping matches the source. It writes its own robustness outputs without modifying the frozen policy or prior evaluation files.
+
+### 2. The six scenarios
+
+The source code evaluates three time-period scenarios and three exposure-policy scenarios.
+
+### A. Time-period sensitivity
+
+Full_Evaluation
+
+All 178 observations in the evaluation window.
+
+First_Half
+
+The first 89 observations in chronological order.
+
+Second_Half
+
+The remaining 89 observations in chronological order.
+
+### B. Exposure-policy sensitivity
+
+| Risk regime | Frozen baseline | Mild de-risking | Stronger de-risking |
+| ----------- | --------------- | --------------- | ------------------- |
+| Low         | 100%            | 100%            | 100%                |
+| Normal      | 100%            | 100%            | 90%                 |
+| Elevated    | 80%             | 90%             | 70%                 |
+| High        | 60%             | 80%             | 50%                 |
+| Extreme     | 40%             | 60%             | 30%                 |
+
+These two alternative mappings are hypothetical sensitivities. They do not replace or recalibrate the frozen baseline policy.
+
+For each scenario, the script calculates both Static and Adaptive performance. That creates 12 detailed result rows: six scenarios × two strategies.
+
+### 3. How the calculations work
+
+For each scenario, Step 15 uses the same return convention as Step 11:
+
+\\[ R\_{\text{static},t}=e^{r_t}-1 \\]
+
+\\[ R\_{\text{adaptive},t}=e^{w_t r_t}-1 \\]
+
+It then calculates:
+
+- Compounded return and arithmetic mean daily return
+- Annualized volatility and zero-risk-free-rate Sharpe ratio
+- Annualized downside deviation
+- Maximum drawdown
+- Number of negative-return days
+- Average adaptive exposure
+
+The summary compares Adaptive against Static, including their compounded-return difference, drawdowns, volatility, and average exposure.
+
+The script also checks that the frozen-baseline mapping reproduces the actual `Portfolio_Exposure` values in the input data. This matters because otherwise the “baseline” robustness result could be evaluating a different strategy from the one originally tested.
+
+## Step 16 — Independently validate the robustness results
+
+The validator, `16_validate_robustness.py`, reads the Step 15 outputs and reconstructs the calculations rather than merely checking whether the files exist.
+
+### Validation checklist
+
+### 1
+
+Input and output schemas
+
+Required files, columns, summary fields, and scenario names.
+
+### 2
+
+Dates and source reconciliation
+
+Unique dates, evaluation-window alignment, numeric integrity, and exposure bounds.
+
+### 3
+
+Frozen policy
+
+Checks the expected baseline risk-to-exposure mapping.
+
+### 4
+
+Six-scenario reconstruction
+
+Recalculates Static and Adaptive returns and metrics for every scenario.
+
+### 5
+
+Detailed CSV reconciliation
+
+Checks dates, row counts, scenario types, exposures, and saved performance metrics.
+
+### 6
+
+Summary JSON reconciliation
+
+Rebuilds the scenario comparisons and checks the six summary records.
+
+### 7
+
+Methodology metadata
+
+Checks that the stated limitations and validation flags are present.
+
+### 8
+
+Read-only integrity
+
+Hashes the tracked files before and after validation to check that they were not modified.
+
+If all checks pass, the script reports `STEP 16 STATUS: PASS`. It can also report a metadata warning separately from a failure.
+
+### What a PASS does—and does not—establish
+
+A PASS establishes that the saved scenarios and summary agree with the source data and the methodology encoded in Steps 15–16.
+
+It does not establish that:
+
+- Either alternative exposure mapping is a better policy.
+- The strategy will outperform in a future period.
+- The chronological halves are independent validation samples.
+- The simplified return formula is the right model for a real portfolio.
+- The results remain favorable after transaction costs; Step 15 explicitly evaluates gross returns.
+
+## How to interpret the results
+
+When reading `robustness_summary.json`, focus on three comparisons:
+
+1. Full evaluation vs. halves: does the relative performance look materially different across the two chronological subperiods?
+2. Frozen baseline vs. Mild de-risking: does the comparison change when exposure is reduced less aggressively in elevated-risk regimes?
+3. Frozen baseline vs. Stronger de-risking: does more defensive exposure materially change returns, volatility, or drawdown?
+
+Do not select the policy solely because it looks best on these same 178 observations. That would turn the evaluation period into a policy-selection dataset and weaken the independence of the evaluation.
+
+## One important project-governance point
+
+The Step 15 summary records the frozen policy status using the policy metadata, and Step 16 checks that the summary is consistent with the expected methodology. Your previous metadata correction changed the fallback behavior when policy status was absent. Preserve the existing validated outputs and avoid rebuilding them casually; if a future change is needed, use a controlled, documented rerun and validate the new outputs.
+
+Next: Steps 17–18 — business decision report builder and validator. These turn the evaluation, cost, and robustness evidence into a consolidated report and check the report's consistency.
+
+## What Step 17 actually produces
+
+The builder creates four report artifacts under `data/business_reporting/v1/`:
+
+| File                              | Purpose                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `business_decision_report.md`     | Main narrative report, suitable for reading in VS Code or GitHub                                 |
+| `decision_metrics.csv`            | Selected metrics extracted from the evaluation, transaction-cost, and robustness JSON summaries  |
+| `transaction_cost_comparison.csv` | Copy of the detailed transaction-cost results                                                    |
+| `robustness_comparison.csv`       | Copy of the detailed robustness results                                                          |
+| `report_manifest.json`            | Source/output hashes, evaluation-period metadata, validation flags, and policy-status comparison |
+
+The script does not retrain models, rerun the transaction-cost calculations, or recompute the robustness scenarios. It assembles the existing outputs and documents what they say.
+
+One especially good feature is that the report itself states the limits of the evidence: both strategies had negative compounded returns over the full evaluation period; alternative exposure mappings are sensitivities rather than proven improvements; and the results do not establish live-trading readiness.
+
+### A subtle but important metadata issue
+
+The builder compares `business_policy.json` against the policy status recorded in `robustness_summary.json`. If they disagree, it preserves the authoritative source policy status and writes a warning rather than silently changing either source file.
+
+That distinction matters because a report can be generated successfully while still carrying a metadata warning.
+
+## Step 18 — Validate the report
+
+`18_validate_business_decision_report.py` is read-only. It checks the generated report package against the source files and manifest.
+
+Its main checks are:
+
+1. File existence: all eight source files and all five expected report artifacts are present.
+2. Manifest identity: correct project name, report version `v1`, and completion status.
+3. Source integrity: hashes in the manifest match the current source files, and sources were recorded as unchanged.
+4. Output integrity: the report and supporting CSV files match their recorded hashes and file sizes.
+5. Copied-table accuracy: the transaction-cost and robustness CSV copies exactly match their source tables.
+6. Metrics table: the expected columns exist and the table is non-empty.
+7. Report content: required sections are present, including Executive summary, Business evaluation, Transaction-cost sensitivity, Robustness results, Business interpretation, Recommended next decision gates, Reproducibility, and Interpretation limits.
+8. Policy metadata: the report and manifest correctly preserve any mismatch between source policy status and robustness-summary status.
+9. Build claims: the manifest's source-presence, schema, row-count, scenario-count, and source-integrity flags are consistent with the expected values.
+10. Read-only check: source hashes are compared again after validation.
+
+The possible final statuses are:
+
+- `STEP 18 STATUS: PASS`
+- `STEP 18 STATUS: PASS WITH METADATA WARNING`
+- `STEP 18 STATUS: FAIL`
+
+A metadata warning is not the same as a failed report-integrity check. It means a discrepancy is transparently recorded and needs to remain visible.
+
+## Where these two scripts fit in the project
+
+Steps 11–16
+
+Evaluation, transaction-cost sensitivity, robustness
+
+Step 17 — Build report
+
+Consolidate existing evidence into Markdown and CSV artifacts
+
+Step 18 — Validate report
+
+Check source integrity, output integrity, copied tables, and required content
+
+Steps 19–20
+
+Business decision review, action register, and decision gates
+
+Your project status: Steps 17–18 were previously recorded as passed. There is no need to rerun them just to study their logic. Rebuilding Step 17 would overwrite its generated report artifacts, so preserve the current outputs unless you intentionally want a new report version.
+
+Next: Steps 19–20 — the business decision review and its validator. Those scripts move from reporting past results to documenting what still needs to be reviewed, what actions are outstanding, and what conditions should be satisfied before any deployment decision.
+
+# Steps 19–20: Business decision review and validation
+
+Steps 17–18 created and validated a report. Steps 19–20 take the next step: they organize the evidence into a review document, an action register, and decision gates.
+
+The key difference is that a report describes what the analysis found; a decision review records what still needs to be checked before proceeding.
+
+## Step 19 — `19_build_business_decision_review.py`
+
+### 1. Inputs and outputs
+
+Main inputs
+
+- Business evaluation CSV and summary
+- Transaction-cost analysis CSV and summary
+- Robustness results CSV and summary
+- Frozen business policy
+- Validated report manifest from Step 17
+
+Output directory: `data/business_decision_review/v1/`
+
+`business_decision_review.md`
+
+Narrative explaining the evidence, its limitations, and the outstanding decision considerations.
+
+`action_register.csv`
+
+Actions that need to be completed or reviewed, including acceptance criteria.
+
+`decision_gates.csv`
+
+Conditions and exit criteria to assess before moving through decision stages.
+
+`evidence_snapshot.csv`
+
+A flattened, traceable snapshot of selected metrics from the evaluation, cost, and robustness summaries.
+
+`review_manifest.json`
+
+Records source and output hashes, file sizes, policy-status comparison, and build-integrity information.
+
+### 2. What the builder does
+
+1. Checks that the required source files exist.
+2. Records source-file SHA-256 hashes before processing.
+3. Loads the evaluation, transaction-cost, robustness, policy, and report-manifest evidence.
+4. Checks that the robustness summary contains the expected six scenarios.
+5. Flattens selected summary values into `evidence_snapshot.csv`.
+6. Builds the narrative review.
+7. Creates the action register and decision-gate register.
+8. Recalculates source hashes, records generated-output hashes, and writes the manifest.
+
+The source files are intended to remain unchanged. The builder also preserves a discrepancy between the policy's status and the robustness summary's recorded status instead of silently treating them as equivalent.
+
+### 3. Understanding the three registers
+
+- Evidence snapshot: What do the current artifacts actually show?
+- Action register: What work remains, and what evidence would count as completing it?
+- Decision gates: What conditions should be satisfied before the project advances to a later stage?
+
+For example, validating the return calculation is an action; having an independently checked return methodology could be an acceptance criterion. A decision gate might require that methodological issue to be resolved before a deployment decision.
+
+These are examples to clarify the distinction, not claims that those exact items have a particular status in your CSVs.
+
+## Step 20 — `20_validate_business_decision_review.py`
+
+The validator reads the review package and checks whether it is complete and consistent. It does not edit the review, action register, decision gates, or source evidence.
+
+### Main validation checks
+
+| Check                      | What it establishes                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| Manifest structure         | Required metadata and file inventories are present                                                 |
+| Source-file integrity      | Current source hashes match the hashes recorded during the build                                   |
+| Output integrity           | Generated files exist and their hashes and byte sizes match the manifest                           |
+| Review artifacts           | The report, action register, gates, and evidence snapshot are readable and contain required fields |
+| Action acceptance criteria | Every action item has criteria for determining completion                                          |
+| Gate exit criteria         | Every decision gate has conditions for determining whether it has been met                         |
+| Evidence consistency       | Expected robustness scenarios and supporting evidence are represented                              |
+| Policy-status handling     | Any discrepancy between the source policy and robustness summary is recorded consistently          |
+
+The validator returns a PASS or FAIL based on its checks. A PASS confirms package integrity and the presence of required review controls; it does not mean that all actions or decision gates have been completed.
+
+## Your actual project status
+
+From the earlier run results recorded for your project:
+
+- Steps 19–20 passed validation.
+- The review manifest recorded all six robustness scenarios and 12 robustness result rows.
+- Action items and decision gates had acceptance/exit criteria.
+- The review and its evidence files were recorded as intact.
+
+That means the review package was structurally validated—not that the strategy has been approved for deployment.
+
+## Why this matters for your job portfolio
+
+Steps 19–20 demonstrate more than Python and financial modelling. They show how an analyst can translate quantitative results into a controlled business process:
+
+- Maintain traceable evidence.
+- Separate findings from outstanding work.
+- Define measurable completion criteria.
+- Make decision requirements explicit.
+- Preserve an audit trail when artifacts change.
+
+That is useful framing for finance analytics, risk analytics, model governance, and business analytics roles.
+
+Next: Steps 21–22 — sign-off workflow and validation.
+
+One caution before we continue: your recorded sign-off state is `NOT_APPROVED`, with gate/action statuses `NOT_REVIEWED` and deployment not approved. Step 21 can regenerate sign-off registers, so do not rerun it merely to study the script. We can review its code without changing any project files.
+
+## Step 21 — Create the sign-off framework
+
+The script `21_build_business_decision_signoff.py` converts the Step 19 review into working templates for formal review.
+
+### Output directory
+
+`data/business_decision_signoff/v1/`
+
+1\. `gate_signoff_register.csv`
+
+Six decision gates, with fields for the reviewer, review date, evidence reference, rationale, blockers, follow-up, and approval reference.
+
+2\. `action_followup_register.csv`
+
+Eight existing action items, retaining their original details and adding fields for follow-up decisions, progress evidence, blockers, and closure evidence.
+
+3\. `signoff_protocol.md`
+
+Instructions for recording review decisions and determining when an action or gate can be considered complete.
+
+4\. `signoff_manifest.json`
+
+Records the input and output hashes, counts, policy metadata, and safeguards.
+
+### The most important safeguards
+
+The script checks that the Step 19 package is complete, that the six gate IDs and eight action IDs are present and unique, and that the evidence snapshot has the expected schema.
+
+It then deliberately initializes the registers to:
+
+| Control                    | Initial state  |
+| -------------------------- | -------------- |
+| Gate review decisions      | `NOT_REVIEWED` |
+| Action follow-up decisions | `NOT_REVIEWED` |
+| Overall sign-off           | `NOT_APPROVED` |
+| Deployment approval        | Not granted    |
+
+The protocol permits `PASS`, `FAIL`, `BLOCKED`, and `NOT_REVIEWED` for gate decisions. A reviewer must inspect the evidence and document the rationale; a successful Python script or validator is not sufficient grounds to mark a gate as passed.
+
+Why rerunning Step 21 matters: it writes new initial-state registers. If you have manually entered review decisions since the previous build, rerunning it can overwrite those entries. Preserve a backup before any intentional rebuild.
+
+## Step 22 — Validate the sign-off framework
+
+`22_validate_business_decision_signoff.py` is read-only. Its checks cover the following:
+
+- Required Step 19 source artifacts and Step 21 output files exist.
+- Manifest identity, source inventory, and generated-output inventory are correct.
+- Source hashes match the manifest, and generated-output hashes and sizes are consistent.
+- The gate register has six unique gates and all initial decisions remain `NOT_REVIEWED`.
+- The action register has eight unique actions and all initial follow-up decisions remain `NOT_REVIEWED`.
+- The original action fields and record order are preserved.
+- Reviewer, evidence, and approval fields have not been fabricated or pre-populated.
+- The protocol documents the required safeguards and limitations.
+- The manifest records that deployment approval has not been granted.
+- The policy metadata discrepancy is accurately preserved.
+
+The validator also checks that the manifest records 379 evidence-snapshot rows, alongside five source artifacts, six gates, and eight actions.
+
+A successful result means the initial sign-off framework is internally consistent. It does not mean that the underlying gates have passed.
+
+## A project-specific issue to keep visible
+
+Your recorded review manifest shows:
+
+- Source policy status: `FROZEN`
+- Robustness-summary policy status: `NOT_SPECIFIED`
+
+The mismatch is explicitly preserved in the sign-off protocol and manifest. It should be investigated through a controlled correction process rather than hidden by changing the status label.
+
+Also, the sign-off protocol notes that the full-period strategy returns were negative. Both points matter when assessing whether the project is ready for any real-world deployment.
+
+## What comes next?
+
+Steps 23–24 assess the remaining evidence gaps and validate that assessment. They are the final pair in your 24-script inventory.
+
+Once we finish those, we can consolidate the whole pipeline into one map showing each script's purpose, inputs, outputs, dependencies, and validation coverage—then identify which tasks remain before packaging the project for GitHub and presenting its business impact.
+
+## Step 23 — Build the business evidence-gap assessment
+
+Script: `23_build_business_evidence_gap_assessment.py`
+
+This is the final assessment-building stage. Its purpose is to identify what evidence is available, what is still missing, and what must be addressed before the business decision framework can be considered ready.
+
+The important distinction is that the project has already generated evaluation results, transaction-cost analysis, robustness tests, a decision report, a review package, and sign-off templates. Those artifacts do not automatically establish that the strategy is ready for real-world use.
+
+The evidence-gap assessment brings that distinction into focus.
+
+### What this stage contributes
+
+- Evidence inventory: records which supporting evidence exists.
+- Gap identification: highlights missing or insufficient evidence.
+- Readiness perspective: helps distinguish completed analytical work from outstanding validation or approval requirements.
+- Auditability: preserves a structured assessment rather than relying only on narrative claims.
+
+The script builds assessment artifacts; it does not retrain the forecasting models or independently prove that the trading strategy will perform well in the future.
+
+## Step 24 — Validate the evidence-gap assessment
+
+Script: `24_validate_business_evidence_gap_assessment.py`
+
+This is the final validator in the 24-script sequence. It checks that the evidence-gap assessment has been generated and that its required structure and contents meet the expected contract.
+
+Your recorded latest result was 15/15 validation checks passed.
+
+That is a useful completion milestone, but interpret it correctly:
+
+| What the pass supports                                    | What it does not establish                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| The assessment artifacts satisfy the validator's checks.  | The model forecasts future volatility accurately in every regime. |
+| The required evidence and gap documentation are present.  | The adaptive strategy will make money in future markets.          |
+| The project has a structured review and sign-off process. | The project has received formal deployment approval.              |
+
+Your recorded overall status remains `NOT_APPROVED`, with gates and actions still `NOT_REVIEWED`. That is consistent with having a complete documentation and validation pipeline while formal business decisions remain outstanding.
+
+## The complete 24-script pipeline
+
+01–05
+
+Database foundation
+
+Load market and research data, validate database integrity, test recovery, and inspect persisted tables.
+
+06–10
+
+Prepare and validate decision inputs
+
+Export research inputs, validate frozen outputs, apply the frozen business policy, and validate the decision dataset.
+
+11–16
+
+Evaluate and stress-test the strategy
+
+Compare static and adaptive exposure, estimate transaction-cost sensitivity, and test alternative periods and exposure policies.
+
+17–20
+
+Report and review
+
+Build the decision report, validate it, create the review package, and validate its evidence, actions, and gates.
+
+21–22
+
+Prepare sign-off
+
+Create the sign-off registers and protocol, then validate their structure and integrity.
+
+23–24
+
+Assess remaining evidence gaps
+
+Generate the final evidence-gap assessment and validate the resulting package.
+
+## What I recommend next
+
+Before making further changes, we should conduct a controlled end-to-end audit rather than rerun all 24 scripts. In particular, we should check:
+
+1. Whether the recorded output files still match their manifests.
+2. Whether any scripts depend on implicit assumptions or have potentially destructive rerun behavior.
+3. Whether the adaptive-return formula matches the intended interpretation of portfolio exposure.
+4. Whether the final report distinguishes historical risk reduction from proven future profitability.
+5. Which evidence gaps and formal approvals remain open.
+
+One important limitation: I have the prior walkthrough and recorded validation results, but not the complete source text of Scripts 23–24 in the material inspected for this response. So I have described their purpose and recorded validation outcome without inventing their exact filenames, output filenames, or individual check names beyond what is established in the project record.

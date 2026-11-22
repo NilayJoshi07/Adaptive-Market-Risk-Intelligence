@@ -1,0 +1,492 @@
+# AMRIS implementation roadmap
+
+Adaptive Market Risk Intelligence System · From current working application to a complete analytics and research product
+
+The roadmap below starts from your existing working AMRIS project, not from scratch. It assumes the research notebooks, SQL/DuckDB workflows, statistical forecasts, business evaluation, risk outputs, and six-page Streamlit application are already built.
+
+The guiding rule is simple: build on completed work; don't reopen it without a specific blocker.
+
+## Overall implementation order
+
+## 01
+
+Power BI MVP
+
+First
+
+Executive overview, market regimes, forecast performance, portfolio risk
+
+## 02
+
+Historical stress testing
+
+Second
+
+New scenario engine using existing market returns and saved policy
+
+## 03
+
+Forecast monitoring
+
+Third
+
+Saved forecast errors, regime results, data coverage, drift indicators
+
+## 04
+
+ML research interface
+
+Fourth
+
+Extend the existing ML page and organize experiment evidence
+
+## 05
+
+Research packaging
+
+Fifth
+
+Documentation, registry, presentation, case study, paper outline
+
+## 06
+
+Derivatives research
+
+Separate phase
+
+Options/futures data, incremental value, and a new research question
+
+The first five phases complete the current AMRIS release. Derivatives analytics is a separate research extension, not a prerequisite for calling the existing application complete.
+
+## Phase 1 — Complete the Power BI MVP
+
+Objective: create a management-facing reporting layer using the same saved research evidence as Streamlit.
+
+### Step 1.1 — Establish the Power BI workspace
+
+Create a dedicated directory without moving or overwriting the research files.
+
+```
+AMRIS/
+├── app/
+├── data/
+├── sql/
+├── dashboards/
+│   └── powerbi/
+│       ├── README.md
+│       ├── data_dictionary.md
+│       ├── measures_reference.md
+│       └── exports/
+├── docs/
+└── tests/
+```
+
+Keep the existing folder structure if `dashboards/`, `docs/`, or `tests/` already contains relevant files. Add only what is missing.
+
+Deliverable: a documented Power BI project location and an inventory of the saved CSVs that the report needs.
+
+### Step 1.2 — Create the first semantic data model
+
+Use Power BI Desktop and import the existing saved datasets. Start with these sources:
+
+| Subject             | Existing source                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| Market history      | `data/processed/nifty50_clean.csv`                                                               |
+| India VIX           | `data/processed/india_vix_clean_daily_2018-01-01_2026-09-22.csv`                                 |
+| OOS forecasts       | `data/research_outputs/v1/oos_forecasts.csv`                                                     |
+| Model performance   | `data/research_outputs/v1/model_performance.csv`                                                 |
+| Rolling risk        | `data/risk_outputs/v1/rolling_historical_risk_126d.csv`                                          |
+| Business evaluation | `data/business_decision/v1/business_decision_data.csv` and the existing saved evaluation outputs |
+
+Use the existing saved filenames as the source of truth. Some pages may need more than one artifact; the table above is the starting set, not a claim that every report visual can be built from only one file.
+
+Create a `DimDate` table and sensible relationships where needed. Keep forecasts, risk estimates, and strategy results at their appropriate observation levels rather than joining tables in ways that multiply records.
+
+Deliverable: a reusable Power BI semantic model and a small data dictionary.
+
+### Step 1.3 — Build four report pages
+
+[Portfolio Risk Analysis Template for Investors & Analysts | Mokkup.ai](https://images.openai.com/static-rsc-4/blV1ViUTIJPL2uwULCWAOPjVBQr9Tb8vlPuuEabva4fQWx_HPpJdJ-Bhgh92GrQdwFeTP5tFQpXs07vB4KiHHnhy2PKqRIMuDFJppZWiA_wdTAbvsHL7BUzmqzOw-ku0rSV8iKtavTcyM5qgZXfSM6cX_zcfOYrNeYB3mienhMw?purpose=inline)
+
+Report page 1 — Executive Overview
+
+KPI cards for latest saved NIFTY close, India VIX, forecast volatility, risk regime, adaptive exposure, and strategy performance. Show source dates and the evaluation window.
+
+[Regime Modelling for the Indian Market (Pt. 3) - Bayesian Network](https://images.openai.com/static-rsc-4/SP-5uHXzEHq9Ja7zePfYdaqbjwJ-WZM89DmaeDrA_zqEJKuRz20VHcnOEkeWKpd0wuLOlJGCVQEtlHt4nAvhLHBCgbKSU_-Zdy0NchPiKDLPHqNjQ2bdvX4nSaloODB_8zIB_0o3_dFiQpoZJr4NLTr5oawvSR077bd6Noto8lw?purpose=inline)
+
+Report page 2 — Market & Regimes
+
+NIFTY history, India VIX history, risk-regime distribution, and forecast volatility by regime.
+
+[Planning.AI - Enterprise Planning, Made Smarter | AuxoAI | AuxoAI](https://images.openai.com/static-rsc-4/RIrvMRQrQHMhoofZoKGg-HLRmGVhzJtxBdraHVjyihnecNBil4XcU6eLsbZilqwfnFHLXc0ixPjeHHS26_bn0g35n2cvVlMI6FreocAiw_Wjuvg6MAVM1KooPQ8C_kiqliTYDmCGIRIyKc0CnphvxZB_PsDKB8L5Vf59i6pzAWI?purpose=inline)
+
+Report page 3 — Forecast Performance
+
+Eight established models, official MAE/RMSE, date-aligned forecasts, and descriptive errors over time. Clearly distinguish official full-sample metrics from filtered-period statistics.
+
+[Build a portfolio volatility web app in 168 lines of Python | by Ashish Singal | Pycob | Medium](https://images.openai.com/static-rsc-4/OtoZ1wXU2h5pRwITNy_OKlHJeeC12P4K-ihDvgaM4zV-3cXjA2xj7bqsysNHy2rC_CR3AWlYfJUoWtjmEYp6C7eAcSnBQY7E_FMOrrKZcYi6RhI7BcceY4Zs2Smmn2grHoqfvSasq4GVJAnpy7lDbYwK5xdfA-X6X18B8e2ffFQ?purpose=inline)
+
+Report page 4 — Portfolio Risk
+
+Static versus adaptive VaR and ES/CVaR, exposure, drawdown, and saved strategy outcomes.
+
+### Step 1.4 — Define the report's reusable measures
+
+Create measures for:
+
+- Latest available observation date.
+- Forecast MAE and RMSE.
+- Average forecast volatility.
+- Static and adaptive terminal wealth.
+- Maximum drawdown.
+- Average adaptive exposure.
+- VaR and ES/CVaR.
+- Observation count.
+
+For every measure, document its source, units, evaluation window, and aggregation method. Where the official metric comes from a saved performance file, use that result rather than silently recomputing it under a different definition.
+
+### Step 1.5 — Publish the first release
+
+Save the Power BI `.pbix` file, record the source paths and refresh procedure, and capture screenshots of all four pages.
+
+Phase 1 is complete when: all four report pages work with the saved data, their filters behave as intended, and the project can be reopened without manually reconstructing the model.
+
+## Phase 2 — Add historical stress testing
+
+Objective: extend your existing strategy evaluation with a transparent scenario engine, without changing the frozen evaluation results.
+
+This should be a new analysis, not another version of the original notebooks.
+
+### Step 2.1 — Define the scenario methodology
+
+Use the existing market return series and saved strategy exposure policy as inputs. Create a separate configuration file for scenario assumptions.
+
+Suggested initial scenarios:
+
+| Scenario          | Example specification                                                          |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Market shock      | One-day market return shocks of −3%, −5%, and −10%                             |
+| Volatility shock  | Multiply a chosen saved volatility level by 1.5× and 2×                        |
+| Sustained decline | Apply a defined series of negative daily returns                               |
+| Recovery path     | Follow a specified drawdown with a subsequent recovery sequence                |
+| Historical replay | Replay a selected historical adverse period using its recorded return sequence |
+
+These are hypothetical scenarios, not claims about likely future outcomes. Treat the shock magnitudes as configurable assumptions.
+
+### Step 2.2 — Build a separate stress-testing module
+
+Suggested new files:
+
+```
+src/
+└── stress_testing/
+    ├── scenarios.py
+    ├── engine.py
+    └── reporting.py
+
+config/
+└── stress_scenarios.json
+
+data/
+└── stress_testing/
+    └── v1/
+```
+
+Adapt these paths to your existing source-code organization instead of duplicating utilities that already exist.
+
+The engine should:
+
+1. Load the required saved returns and exposure series.
+2. Apply a named, documented scenario.
+3. Calculate the resulting strategy return and wealth path.
+4. Report peak-to-trough drawdown, cumulative loss, and recovery where applicable.
+5. Compare static and adaptive exposure under the same scenario.
+6. Save scenario results separately from the original business evaluation.
+
+Be explicit about whether exposure is frozen at its saved value or updated according to the existing policy. These answer different questions and must not be mixed in one result.
+
+### Step 2.3 — Add the stress-testing interface
+
+Add a dedicated section to Streamlit and a corresponding page in Power BI only after the saved scenario outputs are available.
+
+Deliverables:
+
+- Scenario configuration.
+- Separate scenario execution module.
+- Scenario results CSVs.
+- Stress-testing comparison charts.
+- A short methodology note describing assumptions and limitations.
+
+Phase 2 is complete when: a user can select a documented scenario and understand its effect on static versus adaptive historical strategy outcomes without modifying the original evaluation data.
+
+## Phase 3 — Build forecast monitoring
+
+Objective: make the saved research results useful for tracking forecast performance and data quality over time.
+
+The first version should be a historical monitoring layer, not an automated model retraining or live alerting system.
+
+### Step 3.1 — Build the monitoring dataset
+
+Use existing forecast outputs, the model-performance table, saved risk-regime labels, and market data.
+
+Create a monitoring dataset containing, where available:
+
+- Observation date.
+- Actual forecast target.
+- Saved forecast by model.
+- Absolute forecast error.
+- Squared forecast error.
+- Saved risk regime.
+- Data availability and missing-value indicators.
+
+Do not introduce new targets or recalculate the original official performance figures. The error columns are for date-level monitoring.
+
+### Step 3.2 — Add four monitoring views
+
+Forecast error over time
+
+Show rolling descriptive MAE/RMSE, the selected window, and the number of observations used.
+
+Performance by regime
+
+Compare saved forecast errors across Low, Normal, Elevated, High, and Extreme regimes where those labels are available and correctly aligned.
+
+Data coverage
+
+Show expected versus available dates, missing values, latest available dates, and observation counts.
+
+Input drift indicators
+
+Track changes in distributions of existing inputs such as returns, India VIX, and forecast volatility. Label these as descriptive drift indicators, not proof of predictive deterioration.
+
+### Step 3.3 — Add a monitoring status summary
+
+Use transparent status rules based on documented thresholds. Initially, show descriptive states such as within reference range, outside reference range, and insufficient observations. Do not claim that a model has failed simply because a single metric fluctuates.
+
+Deliverables:
+
+- A saved forecast-monitoring dataset.
+- Historical performance and data-coverage charts.
+- A drift-indicator configuration.
+- Monitoring methodology documentation.
+- A new Streamlit monitoring section and/or Power BI page.
+
+Phase 3 is complete when: the application can show how saved forecast performance and input distributions change across time and regimes without refitting a model.
+
+## Phase 4 — Develop the ML research interface
+
+Your current ML Volatility Experiments page already exists and is loading the saved results correctly. Therefore, do not create a second standalone ML dashboard. Extend the existing page.
+
+### Step 4.1 — Organize the experiment registry
+
+Create a single experiment registry, for example:
+
+`docs/research/experiment_registry.csv`
+
+Suggested fields:
+
+| Field                                 | Purpose                                                   |
+| ------------------------------------- | --------------------------------------------------------- |
+| `Experiment_ID`                       | Stable identifier                                         |
+| `Experiment_Name`                     | Model or experiment description                           |
+| `Target`                              | Forecast target definition                                |
+| `Evaluation_Start` / `Evaluation_End` | Evaluation period                                         |
+| `N_Observations`                      | Sample size                                               |
+| `Benchmark`                           | Comparison model                                          |
+| `MAE` / `RMSE`                        | Saved metrics                                             |
+| `Statistical_Test` / `P_Value`        | Saved inference evidence, when available                  |
+| `Artifact_Path`                       | Location of saved evidence                                |
+| `Status`                              | Established benchmark, experimental, rejected, or pending |
+| `Conclusion`                          | Brief evidence-based interpretation                       |
+
+Populate it from existing saved results and the Notebook 04 work log. Where a value is not recorded in the source artifacts, leave it unknown rather than reconstructing it from memory.
+
+### Step 4.2 — Extend the existing ML page
+
+Add these features:
+
+- Experiment selector.
+- Model-to-benchmark comparison.
+- Saved evaluation period and sample count.
+- Error comparison by regime where available.
+- Statistical evidence and interpretation.
+- Artifact availability and experiment status.
+- A short explanation of why an experiment was retained, rejected, or left inconclusive.
+
+The Ridge stacking results should remain clearly identified as experimental until their standalone saved artifacts are available and the result can be reproduced from the recorded evidence.
+
+### Step 4.3 — Separate exploration from production
+
+The interface should never promote a model just because it has the lowest displayed MAE. Any future promotion should require an explicitly documented decision outside the exploratory interface.
+
+Deliverables: experiment registry, improved existing ML page, artifact links or references, and a concise model-decision record.
+
+Phase 4 is complete when: a reviewer can understand what was tested, what evidence exists, what each experiment achieved, and why the established benchmark remains the reference model.
+
+## Phase 5 — Package the research and application
+
+This is the phase that turns your technical work into a coherent project for a portfolio, research presentation, or future academic submission.
+
+### Step 5.1 — Create the project documentation
+
+Suggested documentation structure:
+
+```
+docs/
+├── README_PROJECT.md
+├── architecture.md
+├── data_dictionary.md
+├── methodology.md
+├── application_user_guide.md
+├── limitations_and_governance.md
+└── research/
+    ├── experiment_registry.csv
+    ├── findings_summary.md
+    └── paper_outline.md
+```
+
+Reuse your existing documentation and governance records. These are proposed destinations, not instructions to duplicate files that already exist.
+
+The architecture document should explain the existing flow:
+
+`Market data → SQL/DuckDB → saved research outputs → risk and business evaluation → Streamlit and Power BI`
+
+The methodology document should cover forecast construction, target definition, out-of-sample evaluation, regime classification, risk estimation, policy assumptions, and transaction costs at a level sufficient for another researcher to understand the results.
+
+### Step 5.2 — Prepare the demonstration
+
+Create a presentation of approximately 10–12 slides:
+
+1. Research problem and motivation.
+2. AMRIS objectives and research questions.
+3. Data sources and coverage.
+4. System architecture.
+5. Volatility forecasting methodology.
+6. Out-of-sample forecast results.
+7. ML experiments and benchmark decision.
+8. Risk regimes and VaR/ES.
+9. Static versus adaptive strategy evaluation.
+10. Stress-testing and monitoring extensions.
+11. Limitations and governance.
+12. Contributions and future research.
+
+Use actual saved results for the findings slides. Do not invent performance improvements or describe the system as production-deployed.
+
+### Step 5.3 — Develop the paper outline
+
+A suitable working title is:
+
+Adaptive Market Risk and Volatility Intelligence for the Indian Equity Market: Out-of-Sample Forecasting and Risk-Based Strategy Evaluation
+
+Proposed paper sections:
+
+- Abstract.
+- Introduction and research question.
+- Related literature.
+- Data and preprocessing.
+- Forecasting methodology.
+- Out-of-sample evaluation design.
+- Forecast comparison results.
+- Risk-regime and strategy evaluation.
+- Robustness and transaction-cost sensitivity.
+- Limitations.
+- Conclusion and future research.
+
+Treat this as an outline until the methodology, claims, and evidence are assembled into a manuscript. Stress testing and derivatives analytics should only be included as completed empirical results after they are actually implemented.
+
+### Step 5.4 — Produce the release package
+
+Include:
+
+- Streamlit source code and launch instructions.
+- Power BI `.pbix` report and data-source instructions.
+- Architecture diagram.
+- Methodology and data dictionary.
+- Experiment registry.
+- Presentation and screenshots.
+- Clear historical-data and non-live-trading limitations.
+
+Phase 5 is complete when: a new reviewer can understand the research question, open the application, find the saved evidence, and follow the methodology without needing you to explain the entire project verbally.
+
+## Phase 6 — Start a separate derivatives-data research phase
+
+This is the next research project within AMRIS, not a requirement for the first release.
+
+The goal should be to determine whether derivatives-market information adds value beyond the existing NIFTY and India VIX framework.
+
+### Step 6.1 — Define one research question
+
+Start with:
+
+> Does adding information from NIFTY options and futures improve out-of-sample volatility forecasting or risk-regime assessment beyond the existing EGARCH-t + VIX benchmark?
+
+That gives the expansion a clear purpose rather than simply adding more datasets.
+
+### Step 6.2 — Select the initial data
+
+Begin by investigating historical availability, licensing, and timestamp consistency for:
+
+- NIFTY options implied volatility and available volatility surfaces.
+- Options strike, expiry, and open-interest data.
+- Futures basis and open interest.
+- Existing India VIX and NIFTY data as the baseline.
+
+Do not assume all historical fields are freely available or consistently recorded. Document the source and limitations before building the ingestion pipeline.
+
+### Step 6.3 — Create a separate research workspace
+
+```
+research_extensions/
+└── derivatives_v1/
+    ├── data_sources.md
+    ├── research_design.md
+    ├── feature_dictionary.md
+    ├── experiments/
+    └── outputs/
+```
+
+Keep the new research isolated from the established forecast pipeline and frozen outputs.
+
+### Step 6.4 — Run a controlled comparison
+
+Compare:
+
+1. Existing EGARCH-t + VIX benchmark.
+2. Benchmark plus one clearly defined derivatives feature group.
+3. Additional feature groups only when the initial results justify investigating them.
+
+Use time-ordered validation, a consistent forecast target, comparable evaluation samples, and suitable statistical comparisons. Document the data-availability constraints and any potential look-ahead bias.
+
+Phase 6 is complete when: you have a reproducible conclusion about whether the available derivatives information adds useful out-of-sample evidence—not merely a dataset with more columns.
+
+## Dependencies and completion criteria
+
+| Phase                   | Depends on                                            | Required deliverable                       |
+| ----------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| 1. Power BI MVP         | Existing saved datasets                               | Four-page `.pbix` report                   |
+| 2. Stress testing       | Existing return series and exposure methodology       | Scenario engine and saved results          |
+| 3. Forecast monitoring  | Saved forecasts, targets, regimes                     | Monitoring dataset and dashboard           |
+| 4. ML interface         | Existing ML page and saved artifacts                  | Experiment registry and expanded page      |
+| 5. Research package     | Findings and interfaces from earlier work             | Documentation, presentation, paper outline |
+| 6. Derivatives research | Current release and a feasible historical data source | Separate empirical research extension      |
+
+These phases can overlap slightly, but I would complete the Power BI MVP first, then implement stress testing and monitoring as distinct modules. The ML interface and documentation can develop alongside those modules. Derivatives research should begin after the core release is packaged.
+
+## What I would do first, starting now
+
+The first concrete task is to map the existing saved outputs into the four-page Power BI MVP.
+
+Do not begin by rewriting Python calculations or rebuilding SQL tables. Start by identifying the exact source files for each Power BI visual, then build the semantic model and measures around those saved results.
+
+After that, we can implement each phase as a bounded piece of work with a clear deliverable and completion condition.
+
+The definition of done for the current AMRIS release is not “every possible analysis has been added.” It is:
+
+- The existing research remains preserved.
+- Streamlit and Power BI present the same underlying evidence consistently.
+- Stress testing and monitoring extend the existing work without silently changing it.
+- ML experiments remain clearly separated from the established benchmark.
+- The project is documented and demonstrable.
+- Derivatives analytics has a defined, separate path for future research.
+
+That is the route I recommend for completing AMRIS without letting the project become an endless cycle of auditing and expansion.

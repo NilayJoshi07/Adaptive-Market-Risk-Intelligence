@@ -1,0 +1,43 @@
+{
+  "experiment": "AMRIS VaR/ES rolling-window sensitivity",
+  "status": "PASS",
+  "windows": [
+    126,
+    252,
+    500
+  ],
+  "confidence_levels": [
+    0.95,
+    0.99
+  ],
+  "strategy_names": [
+    "Static",
+    "Adaptive"
+  ],
+  "historical_var_quantile_method": "NumPy linear quantile",
+  "expected_shortfall_definition": "Mean historical losses greater than or equal to VaR",
+  "window_timing": "Exactly Window_Size prior observations; current-date return excluded",
+  "business_observations": 673,
+  "development_observations": 495,
+  "evaluation_observations": 178,
+  "common_evaluation_observations": 173,
+  "common_evaluation_start": "2026-01-08",
+  "common_evaluation_end": "2026-09-22",
+  "max_log_return_reconciliation_difference": 1.6813807290905203e-15,
+  "daily_output_rows": 2116,
+  "summary_rows": 12,
+  "inputs_sha256": {
+    "data\\business_decision\\v1\\business_decision_data.csv": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+    "data\\processed\\nifty50_clean.csv": "774af3db860459eacd3a18a7f608d24670867c7c64f1abf088b3d3994c35a931"
+  },
+  "outputs": [
+    "data\\risk_outputs\\experiments\\var_es_window_sensitivity_v1\\daily_var_es_estimates.csv",
+    "data\\risk_outputs\\experiments\\var_es_window_sensitivity_v1\\evaluation_summary.csv"
+  ],
+  "limitations": [
+    "Exploratory sensitivity experiment, not model approval.",
+    "The adaptive exposure history is available only for the business-decision sample.",
+    "Common-sample results exclude evaluation dates without a full 500-observation history.",
+    "Observed breach rates have limited precision, especially at 99% confidence."
+  ]
+}

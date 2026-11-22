@@ -1,0 +1,39 @@
+{
+    "research_version": "v1",
+    "project": "Adaptive Market Risk Intelligence System",
+    "asset": "NIFTY 50",
+    "forecast_target": "Next-day volatility",
+    "oos_start": "2024-01-01",
+    "oos_end": "2026-09-22",
+    "observations": 673,
+    "information_set": "Strict pre-return information set",
+    "india_vix_column": "India_VIX_PreReturn",
+    "models": [
+        "Historical_20D",
+        "EWMA",
+        "GARCH_t",
+        "GJR_GARCH_t",
+        "EGARCH_t",
+        "Historical_20D_VIX",
+        "EWMA_VIX",
+        "EGARCH_t_VIX"
+    ],
+    "authoritative_sources": {
+        "Historical_20D": "historical_20d_strict",
+        "EWMA": "test_data_vix_timing['EWMA_OneStep_Forecast']",
+        "GARCH_t": "test_data_vix_timing['GARCH_T_Volatility']",
+        "GJR_GARCH_t": "test_data_vix_timing['GJR_GARCH_T_Volatility']",
+        "EGARCH_t": "test_data_vix_timing['EGARCH_T_Volatility']",
+        "Historical_20D_VIX": "oos_hist_vix['Historical_20D_VIX_WalkForward']",
+        "EWMA_VIX": "ewma_vix_forecast",
+        "EGARCH_t_VIX": "egarch_vix"
+    },
+    "validation": {
+        "missing_values": 0,
+        "duplicate_dates": 0,
+        "non_finite_values": 0,
+        "chronological_order": true,
+        "data_contract": "PASSED"
+    },
+    "downstream_rule": "Downstream notebooks must consume the saved authoritative outputs rather than relying on research-notebook in-memory variables."
+}

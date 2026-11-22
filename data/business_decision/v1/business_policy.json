@@ -1,0 +1,31 @@
+{
+    "business_decision_version": "v1",
+    "research_version": "v1",
+    "forecast_source_model": "EGARCH_t_VIX",
+    "forecast_source_column": "EGARCH_t_VIX",
+    "development_period": {
+        "start": "2024-01-01",
+        "end": "2025-12-31",
+        "observations": 495
+    },
+    "evaluation_period": {
+        "start": "2026-01-01",
+        "end": "2026-09-22",
+        "observations": 178
+    },
+    "thresholds": {
+        "Low": 0.004341,
+        "Normal": 0.005549,
+        "Elevated": 0.006882,
+        "High": 0.007676
+    },
+    "exposure_policy": {
+        "Low": 1.0,
+        "Normal": 1.0,
+        "Elevated": 0.8,
+        "High": 0.6,
+        "Extreme": 0.4
+    },
+    "policy_status": "FROZEN",
+    "evaluation_period_used_for_policy_calibration": false
+}

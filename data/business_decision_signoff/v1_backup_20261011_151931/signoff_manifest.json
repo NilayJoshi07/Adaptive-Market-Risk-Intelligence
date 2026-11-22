@@ -1,0 +1,84 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "step": 21,
+  "version": "v1",
+  "status": "COMPLETED",
+  "created_at_utc": "2026-10-09T19:03:33.794971+00:00",
+  "purpose": "Create review registers for gate-level sign-off and action follow-up without modifying source evidence.",
+  "initial_signoff_status": "NOT_APPROVED",
+  "initial_gate_review_status": "NOT_REVIEWED",
+  "source_files": {
+    "business_decision_review": {
+      "path": "data/business_decision_review/v1/business_decision_review.md",
+      "sha256_before": "7ae9125698354d32e3aff3c424e2620111aab17ef3b271b2b05385caea24ddf1",
+      "sha256_after": "7ae9125698354d32e3aff3c424e2620111aab17ef3b271b2b05385caea24ddf1",
+      "unchanged": true
+    },
+    "action_register": {
+      "path": "data/business_decision_review/v1/action_register.csv",
+      "sha256_before": "31be05c7a1a360caf8c620d463d06e7ad6195f24c94febc11c054cae201887fb",
+      "sha256_after": "31be05c7a1a360caf8c620d463d06e7ad6195f24c94febc11c054cae201887fb",
+      "unchanged": true
+    },
+    "decision_gates": {
+      "path": "data/business_decision_review/v1/decision_gates.csv",
+      "sha256_before": "0fd150f007203b058364f4c06e5cb7d5cc1d627dedb3f884513421aa6236f097",
+      "sha256_after": "0fd150f007203b058364f4c06e5cb7d5cc1d627dedb3f884513421aa6236f097",
+      "unchanged": true
+    },
+    "evidence_snapshot": {
+      "path": "data/business_decision_review/v1/evidence_snapshot.csv",
+      "sha256_before": "15b0879ed7ac33ad2cc9b3a6cc98d09e763fc387b96e37dad3dcf936dd3b4f12",
+      "sha256_after": "15b0879ed7ac33ad2cc9b3a6cc98d09e763fc387b96e37dad3dcf936dd3b4f12",
+      "unchanged": true
+    },
+    "review_manifest": {
+      "path": "data/business_decision_review/v1/review_manifest.json",
+      "sha256_before": "f08bd79e96d4f3fa8199d9ed18f980b5868046f08016a6b6819e81e591e6fff4",
+      "sha256_after": "f08bd79e96d4f3fa8199d9ed18f980b5868046f08016a6b6819e81e591e6fff4",
+      "unchanged": true
+    }
+  },
+  "generated_outputs": {
+    "data/business_decision_signoff/v1/gate_signoff_register.csv": {
+      "sha256": "61babf4d8360ac424e613b3f1fa82321dda045b23d22c927fdc86e5788890cab",
+      "bytes": 2026
+    },
+    "data/business_decision_signoff/v1/action_followup_register.csv": {
+      "sha256": "6737ed44fcf6e86529b93e45e58fd0a55bf0c995ceb3ecfe558b0167a4669547",
+      "bytes": 4704
+    },
+    "data/business_decision_signoff/v1/signoff_protocol.md": {
+      "sha256": "e91b2c40821935cfa04a66d755cdf14b8155fe519e07c0fbc878feba99c380b0",
+      "bytes": 3603
+    }
+  },
+  "counts": {
+    "source_artifacts": 5,
+    "decision_gates": 6,
+    "action_items": 8,
+    "evidence_snapshot_rows": 379
+  },
+  "policy_metadata": {
+    "source_policy_status": "FROZEN",
+    "robustness_summary_policy_status": "NOT_SPECIFIED",
+    "matches": false,
+    "warning_preserved": true
+  },
+  "controls": {
+    "source_files_unchanged": true,
+    "gates_automatically_approved": false,
+    "overall_deployment_approval_granted": false,
+    "initial_gate_decision": "NOT_REVIEWED",
+    "initial_action_followup_decision": "NOT_REVIEWED"
+  },
+  "validation": {
+    "required_sources_present": true,
+    "source_schemas_valid": true,
+    "six_decision_gates_present": true,
+    "eight_action_items_present": true,
+    "source_files_unchanged": true,
+    "gate_decisions_not_auto_approved": true,
+    "overall_signoff_not_approved": true
+  }
+}

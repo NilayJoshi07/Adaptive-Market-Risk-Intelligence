@@ -1,0 +1,50 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "step": 23,
+  "artifact": "Business Evidence-Gap Assessment",
+  "version": "v1",
+  "created_utc": "2026-10-13T18:48:49.639280+00:00",
+  "status": "INITIAL_ASSESSMENT_CREATED",
+  "source_files": {
+    "data\\business_decision_signoff\\v1\\gate_signoff_register.csv": {
+      "sha256": "61babf4d8360ac424e613b3f1fa82321dda045b23d22c927fdc86e5788890cab",
+      "bytes": 2026
+    },
+    "data\\business_decision_signoff\\v1\\action_followup_register.csv": {
+      "sha256": "f8753e6ebc4571f42c5ef4dad323751124842c31d1fdcc561bf6a91b3435ced7",
+      "bytes": 4726
+    },
+    "data\\business_decision_signoff\\v1\\signoff_protocol.md": {
+      "sha256": "e91b2c40821935cfa04a66d755cdf14b8155fe519e07c0fbc878feba99c380b0",
+      "bytes": 3603
+    }
+  },
+  "output_files": {
+    "data\\business_evidence_gap_assessment\\v1\\evidence_gap_register.csv": {
+      "sha256": "571b709c01ad0799dbf87f0e36c6b6fc7df256d4911395fcd71d867169e7e4b3",
+      "bytes": 4518
+    },
+    "data\\business_evidence_gap_assessment\\v1\\evidence_gap_assessment.md": {
+      "sha256": "214bc3008beec37d74e92e79385ec96ea2bfebdad77da3ba298d9dfdc34bfefd",
+      "bytes": 6177
+    }
+  },
+  "record_counts": {
+    "gates": 6,
+    "actions": 8,
+    "evidence_gap_rows": 6
+  },
+  "control_states": {
+    "gate_decisions": "NOT_REVIEWED",
+    "evidence_inventory": "NOT_ASSESSED",
+    "independent_verification": "NOT_VERIFIED",
+    "overall_signoff": "NOT_APPROVED",
+    "deployment_approved": false
+  },
+  "limitations": [
+    "This step maps requirements and known findings; it does not independently inspect every underlying evidence artifact.",
+    "NOT_ASSESSED does not mean evidence is absent.",
+    "No source sign-off files were intentionally modified.",
+    "The policy metadata discrepancy remains unresolved."
+  ]
+}

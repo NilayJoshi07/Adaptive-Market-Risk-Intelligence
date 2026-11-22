@@ -1,0 +1,112 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "artifact": "Business Decision Review and Action Register",
+  "version": "v1",
+  "status": "COMPLETED",
+  "generated_at_utc": "2026-10-13T18:45:54.482637+00:00",
+  "evaluation_period": {
+    "start": "2026-01-01",
+    "end": "2026-09-22",
+    "observations": 178
+  },
+  "policy_metadata": {
+    "source_policy_status": "FROZEN",
+    "robustness_summary_policy_status": "FROZEN",
+    "matches": true,
+    "warning_preserved": false
+  },
+  "source_files": {
+    "business_evaluation_csv": {
+      "path": "data/business_evaluation/v1/business_evaluation.csv",
+      "sha256_before": "8e9be1ab47d57bee0947319f1612f3434d2aeeb11e8b9003d160e5c182614bab",
+      "sha256_after": "8e9be1ab47d57bee0947319f1612f3434d2aeeb11e8b9003d160e5c182614bab",
+      "unchanged": true
+    },
+    "business_evaluation_summary": {
+      "path": "data/business_evaluation/v1/business_evaluation_summary.json",
+      "sha256_before": "7691706c50c038aa8297f8ee3e38722e9324cb54cd18028f0843e6c0c3779847",
+      "sha256_after": "7691706c50c038aa8297f8ee3e38722e9324cb54cd18028f0843e6c0c3779847",
+      "unchanged": true
+    },
+    "business_decision_data": {
+      "path": "data/business_decision/v1/business_decision_data.csv",
+      "sha256_before": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+      "sha256_after": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+      "unchanged": true
+    },
+    "business_policy": {
+      "path": "data/business_decision/v1/business_policy.json",
+      "sha256_before": "a25630833ba46e422a95dd9393fc1bf172581fc08bb32dbc12c9299037a2a145",
+      "sha256_after": "a25630833ba46e422a95dd9393fc1bf172581fc08bb32dbc12c9299037a2a145",
+      "unchanged": true
+    },
+    "transaction_cost_csv": {
+      "path": "data/business_evaluation/v1/cost_analysis/transaction_cost_analysis.csv",
+      "sha256_before": "7f019ec3e7256b67d4bbac1850b0732a59430bc54cfc48dcc0ead76213674f59",
+      "sha256_after": "7f019ec3e7256b67d4bbac1850b0732a59430bc54cfc48dcc0ead76213674f59",
+      "unchanged": true
+    },
+    "transaction_cost_summary": {
+      "path": "data/business_evaluation/v1/cost_analysis/transaction_cost_summary.json",
+      "sha256_before": "12c377c5a2b404a7b2a3909deca40713fba4e42420e3db113c5fd81b407c89f8",
+      "sha256_after": "12c377c5a2b404a7b2a3909deca40713fba4e42420e3db113c5fd81b407c89f8",
+      "unchanged": true
+    },
+    "robustness_csv": {
+      "path": "data/business_evaluation/v1/robustness/robustness_results.csv",
+      "sha256_before": "266cc9eba68aba204984f004230553de19855744b8e9ae233ecefdf441654092",
+      "sha256_after": "266cc9eba68aba204984f004230553de19855744b8e9ae233ecefdf441654092",
+      "unchanged": true
+    },
+    "robustness_summary": {
+      "path": "data/business_evaluation/v1/robustness/robustness_summary.json",
+      "sha256_before": "98e907bd7f0e20e77b9ea1ff8e82c34ac3f9bf211c4b7ed063f0b09b3fa811fc",
+      "sha256_after": "98e907bd7f0e20e77b9ea1ff8e82c34ac3f9bf211c4b7ed063f0b09b3fa811fc",
+      "unchanged": true
+    },
+    "validated_report_manifest": {
+      "path": "data/business_reporting/v1/report_manifest.json",
+      "sha256_before": "4b7de979d0e455e6c5ec0f8808f6ebd85644ec875a470d8b2adcce1f251025a6",
+      "sha256_after": "4b7de979d0e455e6c5ec0f8808f6ebd85644ec875a470d8b2adcce1f251025a6",
+      "unchanged": true
+    }
+  },
+  "generated_outputs": {
+    "data/business_decision_review/v1/business_decision_review.md": {
+      "sha256": "7a64acaf493adc16ac57ae1264a49736a190d53024d2856f7413969da5816c7f",
+      "bytes": 5899
+    },
+    "data/business_decision_review/v1/action_register.csv": {
+      "sha256": "f8d75515586469d4c4ae0ee720acaaa306085cd4e091c66bcd80771ae8da3743",
+      "bytes": 4453
+    },
+    "data/business_decision_review/v1/decision_gates.csv": {
+      "sha256": "0fd150f007203b058364f4c06e5cb7d5cc1d627dedb3f884513421aa6236f097",
+      "bytes": 1763
+    },
+    "data/business_decision_review/v1/evidence_snapshot.csv": {
+      "sha256": "ebc058df89f0ec6864105b5e867768bede3f5dc426b2326dd767071c0291389c",
+      "bytes": 32463
+    }
+  },
+  "validation": {
+    "required_sources_present": true,
+    "six_robustness_scenarios_present": true,
+    "twelve_robustness_rows_present": true,
+    "source_files_unchanged": true,
+    "all_action_items_have_acceptance_criteria": true,
+    "all_gates_have_exit_criteria": true
+  },
+  "outputs": [
+    "data/business_decision_review/v1/business_decision_review.md",
+    "data/business_decision_review/v1/action_register.csv",
+    "data/business_decision_review/v1/decision_gates.csv",
+    "data/business_decision_review/v1/evidence_snapshot.csv"
+  ],
+  "limitations": [
+    "Action items and exit criteria are proposed, not completed evidence.",
+    "No original source artifacts were modified.",
+    "The policy metadata discrepancy is preserved for review.",
+    "This report does not authorize live deployment."
+  ]
+}

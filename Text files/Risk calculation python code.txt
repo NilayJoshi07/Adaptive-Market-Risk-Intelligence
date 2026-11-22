@@ -1,0 +1,258 @@
+import json
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from datetime import datetime, timezone
+
+ROOT = Path.cwd()
+
+OOS_PATH = ROOT / "data/research_outputs/v1/oos_forecasts.csv"
+DECISION_PATH = ROOT / "data/business_decision/v1/business_decision_data.csv"
+POLICY_PATH = ROOT / "data/business_decision/v1/business_policy.json"
+
+OUT_DIR = ROOT / "data/risk_outputs/v1"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+OUTPUTS = [
+    OUT_DIR / "historical_tail_risk.csv",
+    OUT_DIR / "risk_return_summary.csv",
+    OUT_DIR / "risk_metadata.json",
+]
+
+print("=" * 76)
+print("ADAPTIVE MARKET RISK INTELLIGENCE SYSTEM")
+print("NEW HISTORICAL RISK CALCULATION — V1")
+print("=" * 76)
+
+# Refuse to overwrite previous outputs from this new module.
+existing = [str(p) for p in OUTPUTS if p.exists()]
+if existing:
+    raise FileExistsError(
+        "Risk output files already exist. Nothing was overwritten:\n"
+        + "\n".join(existing)
+        + "\nInspect or back up these files before choosing a new output version."
+    )
+
+for path in [OOS_PATH, DECISION_PATH, POLICY_PATH]:
+    if not path.exists():
+        raise FileNotFoundError(f"Required input missing: {path}")
+
+# Read the frozen source files; never write to them.
+oos = pd.read_csv(OOS_PATH, parse_dates=["Date"])
+decision = pd.read_csv(DECISION_PATH, parse_dates=["Date"])
+
+with POLICY_PATH.open(encoding="utf-8-sig") as f:
+    policy = json.load(f)
+
+required_oos = {"Date", "NIFTY_Log_Return"}
+required_decision = {
+    "Date", "NIFTY_Log_Return", "Portfolio_Exposure"
+}
+
+if not required_oos.issubset(oos.columns):
+    raise ValueError(f"OOS columns missing: {required_oos - set(oos.columns)}")
+
+if not required_decision.issubset(decision.columns):
+    raise ValueError(
+        f"Decision columns missing: {required_decision - set(decision.columns)}"
+    )
+
+oos = oos.sort_values("Date").reset_index(drop=True)
+decision = decision.sort_values("Date").reset_index(drop=True)
+
+for label, df in [("OOS", oos), ("Decision", decision)]:
+    if df["Date"].duplicated().any():
+        raise ValueError(f"{label}: duplicate dates detected")
+
+    if df["NIFTY_Log_Return"].isna().any():
+        raise ValueError(f"{label}: missing log returns detected")
+
+    values = pd.to_numeric(df["NIFTY_Log_Return"], errors="coerce")
+    if not np.isfinite(values).all():
+        raise ValueError(f"{label}: non-finite log returns detected")
+
+# Convert log returns to simple returns using the frozen
+# business-evaluation methodology.
+oos["Market_Simple_Return"] = np.expm1(oos["NIFTY_Log_Return"])
+decision["Market_Simple_Return"] = np.expm1(
+    decision["NIFTY_Log_Return"]
+)
+
+# Adaptive portfolio return: exposure times simple market return.
+decision["Adaptive_Simple_Return"] = (
+    decision["Portfolio_Exposure"] * decision["Market_Simple_Return"]
+)
+
+if not decision["Portfolio_Exposure"].between(0, 1).all():
+    raise ValueError("Portfolio exposure falls outside [0, 1]")
+
+# Check that the business-evaluation dates reconcile to the
+# corresponding dates in the frozen research output.
+oos_dates = set(oos["Date"])
+decision_dates = set(decision["Date"])
+
+if not decision_dates.issubset(oos_dates):
+    raise ValueError(
+        "Business decision dates do not all exist in the OOS research file"
+    )
+
+evaluation = decision[
+    decision["Date"].between(
+        pd.Timestamp("2026-01-01"),
+        pd.Timestamp("2026-09-22")
+    )
+].copy()
+
+if len(evaluation) != 178:
+    raise ValueError(
+        f"Expected 178 evaluation observations; found {len(evaluation)}"
+    )
+
+# Losses are defined as negative simple returns.
+# VaR and ES are reported as positive loss magnitudes.
+def tail_metrics(returns, confidence):
+    r = pd.Series(returns, dtype="float64").dropna().to_numpy()
+
+    if len(r) < 20:
+        raise ValueError("Too few observations for this historical estimate")
+
+    losses = -r
+    var = float(np.quantile(losses, confidence, method="linear"))
+    tail_losses = losses[losses >= var]
+    es = float(tail_losses.mean())
+
+    return {
+        "VaR": var,
+        "ES_CVaR": es,
+        "Tail_Observations": int(len(tail_losses)),
+    }
+
+def return_metrics(returns):
+    r = pd.Series(returns, dtype="float64").dropna()
+
+    if len(r) < 2:
+        raise ValueError("At least two observations are required")
+
+    wealth = (1 + r).cumprod()
+    peak = wealth.cummax()
+    drawdown = wealth / peak - 1
+
+    downside = np.minimum(r.to_numpy(), 0.0)
+
+    return {
+        "Observations": int(len(r)),
+        "Mean_Daily_Return": float(r.mean()),
+        "Daily_Return_StdDev": float(r.std(ddof=1)),
+        "Annualized_Volatility": float(r.std(ddof=1) * np.sqrt(252)),
+        "Compounded_Return": float(wealth.iloc[-1] - 1),
+        "Maximum_Drawdown": float(drawdown.min()),
+        "Negative_Return_Days": int((r < 0).sum()),
+        "Annualized_Downside_Deviation": float(
+            np.sqrt(np.mean(downside ** 2)) * np.sqrt(252)
+        ),
+    }
+
+# Each period/strategy is evaluated separately.
+series_to_evaluate = {
+    "OOS_Market_2024_to_2026": (
+        oos["Market_Simple_Return"], "2024-01-01", "2026-09-22"
+    ),
+    "Evaluation_Static_2026": (
+        evaluation["Market_Simple_Return"], "2026-01-01", "2026-09-22"
+    ),
+    "Evaluation_Adaptive_2026": (
+        evaluation["Adaptive_Simple_Return"], "2026-01-01", "2026-09-22"
+    ),
+}
+
+tail_rows = []
+summary_rows = []
+
+for series_name, (returns, start, end) in series_to_evaluate.items():
+    metrics = return_metrics(returns)
+
+    summary_rows.append({
+        "Series": series_name,
+        "Start_Date": start,
+        "End_Date": end,
+        **metrics,
+    })
+
+    for confidence in [0.95, 0.99]:
+        tail = tail_metrics(returns, confidence)
+
+        tail_rows.append({
+            "Series": series_name,
+            "Start_Date": start,
+            "End_Date": end,
+            "Confidence_Level": confidence,
+            "Horizon": "1 trading day",
+            "Return_Convention": "Simple return",
+            "Loss_Convention": "Loss = -simple return; positive VaR/ES means loss",
+            **tail,
+        })
+
+tail_df = pd.DataFrame(tail_rows)
+summary_df = pd.DataFrame(summary_rows)
+
+metadata = {
+    "project": "Adaptive Market Risk Intelligence System",
+    "risk_output_version": "v1",
+    "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+    "status": "NEW_HISTORICAL_RISK_OUTPUTS",
+    "source_files": [
+        "data/research_outputs/v1/oos_forecasts.csv",
+        "data/business_decision/v1/business_decision_data.csv",
+        "data/business_decision/v1/business_policy.json",
+    ],
+    "return_methodology": (
+        "Simple return = exp(NIFTY_Log_Return) - 1"
+    ),
+    "adaptive_return_methodology": (
+        "Adaptive simple return = Portfolio_Exposure * simple market return; "
+        "uninvested cash assumed to earn 0%"
+    ),
+    "risk_methodology": {
+        "VaR": "Empirical quantile of negative simple returns",
+        "ES_CVaR": (
+            "Mean of observed losses greater than or equal to the "
+            "empirical VaR threshold"
+        ),
+        "confidence_levels": [0.95, 0.99],
+        "horizon": "One trading day",
+        "annualization_factor": 252,
+    },
+    "research_baseline_modified": False,
+    "business_policy_modified": False,
+    "limitations": [
+        "Historical estimates depend on the selected sample period.",
+        "The 99% tail estimate is based on a limited number of extreme observations.",
+        "No transaction costs are included in these new return-risk estimates.",
+        "These outputs are analytical estimates, not trading approval.",
+    ],
+}
+
+tail_df.to_csv(OUTPUTS[0], index=False)
+summary_df.to_csv(OUTPUTS[1], index=False)
+
+with OUTPUTS[2].open("w", encoding="utf-8") as f:
+    json.dump(metadata, f, indent=2)
+
+print("\nVALIDATION")
+print("OOS observations:", len(oos))
+print("Evaluation observations:", len(evaluation))
+print("Decision dates reconciled to OOS dates: PASS")
+print("Source files modified: NO")
+print("Frozen policy modified: NO")
+
+print("\nHISTORICAL VAR / EXPECTED SHORTFALL")
+print(tail_df.to_string(index=False))
+
+print("\nRETURN AND DRAWDOWN SUMMARY")
+print(summary_df.to_string(index=False))
+
+print("\nNEW FILES CREATED")
+for path in OUTPUTS:
+    print(path.relative_to(ROOT), "| bytes:", path.stat().st_size)
+
+print("\nCompleted. Existing baseline files were not overwritten.")

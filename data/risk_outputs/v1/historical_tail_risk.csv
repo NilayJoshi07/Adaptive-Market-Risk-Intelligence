@@ -1,0 +1,7 @@
+Series,Start_Date,End_Date,Confidence_Level,Horizon,Return_Convention,Loss_Convention,VaR,ES_CVaR,Tail_Observations
+OOS_Market_2024_to_2026,2024-01-01,2026-09-22,0.95,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.013337302980721008,0.019270886065212215,34
+OOS_Market_2024_to_2026,2024-01-01,2026-09-22,0.99,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.02118116158703314,0.03139448075881647,7
+Evaluation_Static_2026,2026-01-01,2026-09-22,0.95,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.015608094872616026,0.021625388272188135,9
+Evaluation_Static_2026,2026-01-01,2026-09-22,0.99,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.0224619516753491,0.029329265431448155,2
+Evaluation_Adaptive_2026,2026-01-01,2026-09-22,0.95,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.009299081194385647,0.011421737164001525,9
+Evaluation_Adaptive_2026,2026-01-01,2026-09-22,0.99,1 trading day,Simple return,Loss = -simple return; positive VaR/ES means loss,0.01170930935788727,0.014994253915743182,2

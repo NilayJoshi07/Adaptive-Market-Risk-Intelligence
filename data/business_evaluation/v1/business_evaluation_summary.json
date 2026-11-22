@@ -1,0 +1,102 @@
+{
+    "business_decision_version": "v1",
+    "evaluation_period": {
+        "start": "2026-01-01",
+        "end": "2026-09-22",
+        "observations": 178
+    },
+    "forecast_source": "EGARCH_t_VIX",
+    "policy_status": "FROZEN",
+    "return_methodology": {
+        "static_return": "exp(NIFTY_Log_Return) - 1",
+        "adaptive_log_return_diagnostic": "NIFTY_Log_Return * Portfolio_Exposure (diagnostic only)",
+        "adaptive_return": "Portfolio_Exposure * (exp(NIFTY_Log_Return) - 1)",
+        "exposure_applied_to": "simple_market_return; uninvested cash assumed to earn 0%"
+    },
+    "static_strategy": {
+        "arithmetic_return": -0.10571873231319762,
+        "compounded_return": -0.1071811145690148,
+        "terminal_wealth": 0.8928188854309852,
+        "maximum_drawdown": -0.15181809374299327,
+        "annualized_volatility": 0.1472328699495021,
+        "annualized_downside_deviation": 0.10961257199237137,
+        "sharpe_ratio": -1.0165475724586808,
+        "negative_return_observations": 91,
+        "negative_return_sum": -0.6635543627946172
+    },
+    "adaptive_strategy": {
+        "arithmetic_return": -0.05954090832718711,
+        "compounded_return": -0.060537965791418236,
+        "terminal_wealth": 0.9394620342085818,
+        "maximum_drawdown": -0.08472961205497098,
+        "annualized_volatility": 0.09084475893955984,
+        "annualized_downside_deviation": 0.06539461655921078,
+        "sharpe_ratio": -0.9278891947096196,
+        "negative_return_observations": 91,
+        "negative_return_sum": -0.4295877685396467
+    },
+    "business_impact": {
+        "arithmetic_return_advantage": 0.04617782398601051,
+        "compounded_return_advantage": 0.046643148777596566,
+        "drawdown_improvement": 0.06708848168802228,
+        "volatility_reduction": 0.05638811100994226,
+        "downside_deviation_reduction": 0.044217955433160594,
+        "average_exposure": 0.756179775280899,
+        "average_exposure_reduction": 0.24382022471910103,
+        "high_extreme_observations": 61,
+        "high_extreme_share": 0.34269662921348315,
+        "high_extreme_average_exposure": 0.43606557377049193
+    },
+    "regime_summary": [
+        {
+            "Risk_Regime": "Low",
+            "Observations": 24,
+            "Average_Forecasted_Volatility": 0.003951086846837391,
+            "Average_Exposure": 1.0,
+            "Static_Return": -0.02142883778440241,
+            "Adaptive_Return": -0.02142883778440241,
+            "Protection_Benefit": 0.0,
+            "Return_Advantage": 0.0
+        },
+        {
+            "Risk_Regime": "Normal",
+            "Observations": 48,
+            "Average_Forecasted_Volatility": 0.004909143518184119,
+            "Average_Exposure": 1.0,
+            "Static_Return": 0.0198937677494595,
+            "Adaptive_Return": 0.0198937677494595,
+            "Protection_Benefit": 0.0,
+            "Return_Advantage": 0.0
+        },
+        {
+            "Risk_Regime": "Elevated",
+            "Observations": 45,
+            "Average_Forecasted_Volatility": 0.006088581033842247,
+            "Average_Exposure": 0.8,
+            "Static_Return": -0.023286304850280604,
+            "Adaptive_Return": -0.01862904388022449,
+            "Protection_Benefit": 0.004657260970056113,
+            "Return_Advantage": 0.004657260970056115
+        },
+        {
+            "Risk_Regime": "High",
+            "Observations": 11,
+            "Average_Forecasted_Volatility": 0.0072596276513883454,
+            "Average_Exposure": 0.6,
+            "Static_Return": -0.03508925720415035,
+            "Adaptive_Return": -0.021053554322490207,
+            "Protection_Benefit": 0.014035702881660141,
+            "Return_Advantage": 0.014035702881660141
+        },
+        {
+            "Risk_Regime": "Extreme",
+            "Observations": 50,
+            "Average_Forecasted_Volatility": 0.010983128607416133,
+            "Average_Exposure": 0.4,
+            "Static_Return": -0.045808100223823756,
+            "Adaptive_Return": -0.018323240089529503,
+            "Protection_Benefit": 0.027484860134294246,
+            "Return_Advantage": 0.027484860134294253
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "business_decision_version": "v1",
+    "source": "DuckDB",
+    "database": "D:\\DS Projects\\Adaptive Market Risk Intelligence System\\data\\database\\adaptive_market_risk.duckdb",
+    "source_table": "research_oos_forecasts",
+    "research_version": "v1",
+    "files": {
+        "business_decision_data.csv": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+        "business_policy.json": "a25630833ba46e422a95dd9393fc1bf172581fc08bb32dbc12c9299037a2a145"
+    },
+    "validation": {
+        "observations": 673,
+        "development_observations": 495,
+        "evaluation_observations": 178,
+        "start": "2024-01-01",
+        "end": "2026-09-22",
+        "forecast_source_model": "EGARCH_t_VIX",
+        "policy_status": "FROZEN",
+        "evaluation_period_used_for_policy_calibration": false
+    }
+}

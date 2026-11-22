@@ -1,0 +1,31 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "risk_output_version": "v1",
+  "generated_at_utc": "2026-10-14T17:52:52.226411+00:00",
+  "status": "NEW_HISTORICAL_RISK_OUTPUTS",
+  "source_files": [
+    "data/research_outputs/v1/oos_forecasts.csv",
+    "data/business_decision/v1/business_decision_data.csv",
+    "data/business_decision/v1/business_policy.json"
+  ],
+  "return_methodology": "Simple return = exp(NIFTY_Log_Return) - 1",
+  "adaptive_return_methodology": "Adaptive simple return = Portfolio_Exposure * simple market return; uninvested cash assumed to earn 0%",
+  "risk_methodology": {
+    "VaR": "Empirical quantile of negative simple returns",
+    "ES_CVaR": "Mean of observed losses greater than or equal to the empirical VaR threshold",
+    "confidence_levels": [
+      0.95,
+      0.99
+    ],
+    "horizon": "One trading day",
+    "annualization_factor": 252
+  },
+  "research_baseline_modified": false,
+  "business_policy_modified": false,
+  "limitations": [
+    "Historical estimates depend on the selected sample period.",
+    "The 99% tail estimate is based on a limited number of extreme observations.",
+    "No transaction costs are included in these new return-risk estimates.",
+    "These outputs are analytical estimates, not trading approval."
+  ]
+}

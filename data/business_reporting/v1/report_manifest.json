@@ -1,0 +1,98 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "report_version": "v1",
+  "status": "COMPLETED",
+  "generated_at_utc": "2026-10-13T18:44:32.786916+00:00",
+  "evaluation_period": {
+    "start": "2026-01-01",
+    "end": "2026-09-22",
+    "observations": 178
+  },
+  "policy_metadata_check": {
+    "source_policy_status": "FROZEN",
+    "robustness_summary_policy_status": "FROZEN",
+    "status_matches": true,
+    "warning": null
+  },
+  "source_files": {
+    "business_evaluation_csv": {
+      "path": "data\\business_evaluation\\v1\\business_evaluation.csv",
+      "sha256_before": "8e9be1ab47d57bee0947319f1612f3434d2aeeb11e8b9003d160e5c182614bab",
+      "sha256_after": "8e9be1ab47d57bee0947319f1612f3434d2aeeb11e8b9003d160e5c182614bab",
+      "unchanged": true
+    },
+    "business_evaluation_summary": {
+      "path": "data\\business_evaluation\\v1\\business_evaluation_summary.json",
+      "sha256_before": "7691706c50c038aa8297f8ee3e38722e9324cb54cd18028f0843e6c0c3779847",
+      "sha256_after": "7691706c50c038aa8297f8ee3e38722e9324cb54cd18028f0843e6c0c3779847",
+      "unchanged": true
+    },
+    "business_decision_data": {
+      "path": "data\\business_decision\\v1\\business_decision_data.csv",
+      "sha256_before": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+      "sha256_after": "8af667ec5398eb95fcae27b7dea35d8917e1c9a74cab9c5eda417fba5815efc2",
+      "unchanged": true
+    },
+    "business_policy": {
+      "path": "data\\business_decision\\v1\\business_policy.json",
+      "sha256_before": "a25630833ba46e422a95dd9393fc1bf172581fc08bb32dbc12c9299037a2a145",
+      "sha256_after": "a25630833ba46e422a95dd9393fc1bf172581fc08bb32dbc12c9299037a2a145",
+      "unchanged": true
+    },
+    "transaction_cost_csv": {
+      "path": "data\\business_evaluation\\v1\\cost_analysis\\transaction_cost_analysis.csv",
+      "sha256_before": "7f019ec3e7256b67d4bbac1850b0732a59430bc54cfc48dcc0ead76213674f59",
+      "sha256_after": "7f019ec3e7256b67d4bbac1850b0732a59430bc54cfc48dcc0ead76213674f59",
+      "unchanged": true
+    },
+    "transaction_cost_summary": {
+      "path": "data\\business_evaluation\\v1\\cost_analysis\\transaction_cost_summary.json",
+      "sha256_before": "12c377c5a2b404a7b2a3909deca40713fba4e42420e3db113c5fd81b407c89f8",
+      "sha256_after": "12c377c5a2b404a7b2a3909deca40713fba4e42420e3db113c5fd81b407c89f8",
+      "unchanged": true
+    },
+    "robustness_csv": {
+      "path": "data\\business_evaluation\\v1\\robustness\\robustness_results.csv",
+      "sha256_before": "266cc9eba68aba204984f004230553de19855744b8e9ae233ecefdf441654092",
+      "sha256_after": "266cc9eba68aba204984f004230553de19855744b8e9ae233ecefdf441654092",
+      "unchanged": true
+    },
+    "robustness_summary": {
+      "path": "data\\business_evaluation\\v1\\robustness\\robustness_summary.json",
+      "sha256_before": "98e907bd7f0e20e77b9ea1ff8e82c34ac3f9bf211c4b7ed063f0b09b3fa811fc",
+      "sha256_after": "98e907bd7f0e20e77b9ea1ff8e82c34ac3f9bf211c4b7ed063f0b09b3fa811fc",
+      "unchanged": true
+    }
+  },
+  "generated_outputs": {
+    "data\\business_reporting\\v1\\business_decision_report.md": {
+      "sha256": "64b4fe73b3df628124e5137927cd1c4252f1f53480fee013b4f47e37f71026e9",
+      "bytes": 7507
+    },
+    "data\\business_reporting\\v1\\decision_metrics.csv": {
+      "sha256": "1a2e04dc92d2f7d4b61a0af85e4dc33eae0ca3153baf45e4fe465ed69441007e",
+      "bytes": 26186
+    },
+    "data\\business_reporting\\v1\\robustness_comparison.csv": {
+      "sha256": "1fcc1fa10b6844b4a5884156b5bccd6348b2e00dcc6cf2c7eab5fd0e44c38b0b",
+      "bytes": 2843
+    },
+    "data\\business_reporting\\v1\\transaction_cost_comparison.csv": {
+      "sha256": "31d5594b087f95764c9c5a1f850c4112c8e8d7cbc9cdfed0e340f155b6e56b0f",
+      "bytes": 121877
+    }
+  },
+  "validation": {
+    "required_sources_present": true,
+    "robustness_schema_valid": true,
+    "robustness_row_count_valid": true,
+    "robustness_scenario_count_valid": true,
+    "source_files_unchanged": true
+  },
+  "outputs": [
+    "data\\business_reporting\\v1\\business_decision_report.md",
+    "data\\business_reporting\\v1\\decision_metrics.csv",
+    "data\\business_reporting\\v1\\robustness_comparison.csv",
+    "data\\business_reporting\\v1\\transaction_cost_comparison.csv"
+  ]
+}

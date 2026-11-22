@@ -1,0 +1,61 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "step": 23,
+  "artifact": "Business Evidence-Gap Assessment",
+  "version": "v2",
+  "created_utc": "2026-10-13T13:50:50.020025+00:00",
+  "status": "UPDATED_INITIAL_ASSESSMENT",
+  "source_files": {
+    "data\\business_decision_signoff\\v1\\gate_signoff_register.csv": {
+      "sha256": "61babf4d8360ac424e613b3f1fa82321dda045b23d22c927fdc86e5788890cab",
+      "bytes": 2026
+    },
+    "data\\business_decision_signoff\\v1\\action_followup_register.csv": {
+      "sha256": "f8753e6ebc4571f42c5ef4dad323751124842c31d1fdcc561bf6a91b3435ced7",
+      "bytes": 4726
+    },
+    "data\\business_decision_signoff\\v1\\signoff_protocol.md": {
+      "sha256": "e91b2c40821935cfa04a66d755cdf14b8155fe519e07c0fbc878feba99c380b0",
+      "bytes": 3603
+    }
+  },
+  "output_files": {
+    "data\\business_evidence_gap_assessment\\v2\\evidence_gap_register.csv": {
+      "sha256": "a7ed8ccb23f8cc4ec8c11427e18dc6d7020e325411b1d4bce52ba67ca3a80e9b",
+      "bytes": 5039
+    },
+    "data\\business_evidence_gap_assessment\\v2\\evidence_gap_assessment.md": {
+      "sha256": "5ae49de9e0531e2f51910d4831f8c280efe123b93445a3aa31b879b6127f35a8",
+      "bytes": 6852
+    }
+  },
+  "record_counts": {
+    "gates": 6,
+    "actions": 8,
+    "evidence_gap_rows": 6
+  },
+  "control_states": {
+    "gate_decisions": "NOT_REVIEWED",
+    "evidence_inventory": "PARTIALLY_ASSESSED_FOR_G01",
+    "independent_verification": "NOT_VERIFIED",
+    "overall_signoff": "NOT_APPROVED",
+    "deployment_approved": false
+  },
+  "limitations": [
+    "This step maps requirements and known findings; it does not independently inspect every underlying evidence artifact.",
+    "NOT_ASSESSED does not mean evidence is absent.",
+    "No source sign-off files were intentionally modified.",
+    "The current policy and robustness-summary metadata match. The origin of the historical NOT_SPECIFIED finding has not been established.",
+    "This update does not independently validate the policy methodology or approve any deployment."
+  ],
+  "metadata_comparison": {
+    "policy_file": "data\\business_decision\\v1\\business_policy.json",
+    "policy_status": "FROZEN",
+    "robustness_summary_file": "data\\business_evaluation\\v1\\robustness\\robustness_summary.json",
+    "frozen_policy_status": "FROZEN",
+    "comparison": "MATCH",
+    "historical_not_specified_origin": "NOT_ESTABLISHED",
+    "independent_verification": "NOT_VERIFIED",
+    "a01_closure": "OPEN_PENDING_REVIEW"
+  }
+}

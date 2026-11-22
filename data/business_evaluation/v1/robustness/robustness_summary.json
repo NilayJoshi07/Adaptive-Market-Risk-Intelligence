@@ -1,0 +1,110 @@
+{
+  "project": "Adaptive Market Risk Intelligence System",
+  "analysis": "Robustness and exposure-policy sensitivity",
+  "analysis_version": "v1",
+  "status": "COMPLETED",
+  "evaluation_start": "2026-01-01",
+  "evaluation_end": "2026-09-22",
+  "observations": 178,
+  "frozen_policy_status": "FROZEN",
+  "scenario_count": 6,
+  "scenarios": [
+    {
+      "scenario": "Full_Evaluation",
+      "scenario_type": "Chronological_Subperiod",
+      "observations": 178,
+      "static_compounded_return": -0.1071811145690148,
+      "adaptive_compounded_return": -0.06053796579141957,
+      "adaptive_minus_static_compounded_return": 0.046643148777595234,
+      "static_maximum_drawdown": -0.15181809374299327,
+      "adaptive_maximum_drawdown": -0.08472961205497154,
+      "static_annualized_volatility": 0.14723286994950185,
+      "adaptive_annualized_volatility": 0.09084475893955962,
+      "adaptive_mean_exposure": 0.756179775280899
+    },
+    {
+      "scenario": "First_Half",
+      "scenario_type": "Chronological_Subperiod",
+      "observations": 89,
+      "static_compounded_return": -0.09514495616239682,
+      "adaptive_compounded_return": -0.05722250837849474,
+      "adaptive_minus_static_compounded_return": 0.03792244778390208,
+      "static_maximum_drawdown": -0.15181809374299327,
+      "adaptive_maximum_drawdown": -0.08472961205497154,
+      "static_annualized_volatility": 0.18176678260180135,
+      "adaptive_annualized_volatility": 0.09453300515074134,
+      "adaptive_mean_exposure": 0.6292134831460675
+    },
+    {
+      "scenario": "Second_Half",
+      "scenario_type": "Chronological_Subperiod",
+      "observations": 89,
+      "static_compounded_return": -0.01330175312453541,
+      "adaptive_compounded_return": -0.003516691310929354,
+      "adaptive_minus_static_compounded_return": 0.009785061813606055,
+      "static_maximum_drawdown": -0.06683139865356214,
+      "adaptive_maximum_drawdown": -0.06457502821172467,
+      "static_annualized_volatility": 0.10223735496517777,
+      "adaptive_annualized_volatility": 0.08725766175102305,
+      "adaptive_mean_exposure": 0.8831460674157303
+    },
+    {
+      "scenario": "Frozen_Baseline",
+      "scenario_type": "Hypothetical_Exposure_Mapping",
+      "observations": 178,
+      "static_compounded_return": -0.1071811145690148,
+      "adaptive_compounded_return": -0.06053796579141957,
+      "adaptive_minus_static_compounded_return": 0.046643148777595234,
+      "static_maximum_drawdown": -0.15181809374299327,
+      "adaptive_maximum_drawdown": -0.08472961205497154,
+      "static_annualized_volatility": 0.14723286994950185,
+      "adaptive_annualized_volatility": 0.09084475893955962,
+      "adaptive_mean_exposure": 0.756179775280899
+    },
+    {
+      "scenario": "Mild_DeRisking",
+      "scenario_type": "Hypothetical_Exposure_Mapping",
+      "observations": 178,
+      "static_compounded_return": -0.1071811145690148,
+      "adaptive_compounded_return": -0.07899154509470308,
+      "adaptive_minus_static_compounded_return": 0.028189569474311726,
+      "static_maximum_drawdown": -0.15181809374299327,
+      "adaptive_maximum_drawdown": -0.10909337946123643,
+      "static_annualized_volatility": 0.14723286994950185,
+      "adaptive_annualized_volatility": 0.10961280514250622,
+      "adaptive_mean_exposure": 0.8499999999999999
+    },
+    {
+      "scenario": "Stronger_DeRisking",
+      "scenario_type": "Hypothetical_Exposure_Mapping",
+      "observations": 178,
+      "static_compounded_return": -0.1071811145690148,
+      "adaptive_compounded_return": -0.05185915500894467,
+      "adaptive_minus_static_compounded_return": 0.05532195956007013,
+      "static_maximum_drawdown": -0.15181809374299327,
+      "adaptive_maximum_drawdown": -0.07105854770002817,
+      "static_annualized_volatility": 0.14723286994950185,
+      "adaptive_annualized_volatility": 0.07795238240394048,
+      "adaptive_mean_exposure": 0.6696629213483147
+    }
+  ],
+  "interpretation_limits": [
+    "Chronological subperiods are descriptive checks, not independent validation.",
+    "Alternative exposure mappings are hypothetical sensitivity scenarios.",
+    "The risk regimes and thresholds remain frozen; no evaluation-period recalibration was performed.",
+    "These results are gross of transaction costs.",
+    "Changing exposure mappings does not establish an optimal policy.",
+    "Adaptive returns weight the daily simple market return by exposure and assume 0% return on uninvested cash.",
+    "Turnover and execution costs are not modelled in this gross-return robustness analysis."
+  ],
+  "outputs": {
+    "detailed_results": "data\\business_evaluation\\v1\\robustness\\robustness_results.csv",
+    "scenario_summary": "data\\business_evaluation\\v1\\robustness\\robustness_summary.json"
+  },
+  "validation": {
+    "date_reconciliation": true,
+    "baseline_exposure_reconciled": true,
+    "all_metrics_finite": true,
+    "source_files_read_only": true
+  }
+}
